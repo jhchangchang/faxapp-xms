@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>팩스 시스템 현장 테스트</title>
+<style>
+/* ============================================================
+   팩스 시스템 현장 진단 도구
+   컨셉: 정밀 계측 장비의 계기판. 밝고 깨끗하고 신뢰감.
+   색: 종이빛 배경 + 슬레이트 텍스트 + 계측 블루 + 신호등 상태색
+   타이포: 산세리프 본문 + 등폭 데이터(계측값 느낌)
+   시그니처: 상단 시스템 상태 바 (신호등)
+   ============================================================ */
+:root{
+  --bg:#f6f8fb;
+  --surface:#ffffff;
+  --surface-2:#f2f5f9;
+  --line:#e3e8f0;
+  --line-2:#d3dae6;
+  --text:#1a2233;
+  --text-2:#5a6478;
+  --text-3:#8c96ab;
+  --blue:#2563eb;
+  --blue-h:#1d4fd7;
+  --blue-soft:#eef3fe;
+  --ok:#0f9d58;
+  --ok-soft:#e7f6ee;
+  --err:#e0483d;
+  --err-soft:#fdecea;
+  --wait:#e08c1a;
+  --wait-soft:#fdf3e3;
+  --mono:'SF Mono','JetBrains Mono','Consolas','Roboto Mono',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:24px}
+
+/* ===== 헤더 ===== */
+header{margin-bottom:20px}
+.title-row{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+header h1{font-size:19px;font-weight:700;letter-spacing:-.3px}
+header h1 .sub{font-weight:500;color:var(--text-3);font-size:13px;margin-left:10px}
+.server-tag{font-family:var(--mono);font-size:12px;color:var(--text-2);background:var(--surface);border:1px solid var(--line);padding:4px 10px;border-radius:6px}
+
+/* 시그니처: 시스템 상태 바 */
+.status-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.status-cell{background:var(--surface);padding:13px 16px;display:flex;align-items:center;gap:11px}
+.status-cell .led{width:9px;height:9px;border-radius:50%;background:var(--text-3);flex-shrink:0;position:relative}
+.status-cell .led.on{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+.status-cell .led.off{background:var(--err);box-shadow:0 0 0 3px var(--err-soft)}
+.status-cell .led.pending{background:var(--wait);box-shadow:0 0 0 3px var(--wait-soft)}
+.status-cell .led.on::after{content:'';position:absolute;inset:0;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+@keyframes pulse{0%{opacity:.6;transform:scale(1)}70%{opacity:0;transform:scale(2.4)}100%{opacity:0}}
+.status-cell .info{min-width:0}
+.status-cell .k{font-size:11.5px;color:var(--text-3);font-weight:500}
+.status-cell .v{font-size:13.5px;font-weight:650;color:var(--text)}
+@media(max-width:720px){.status-bar{grid-template-columns:repeat(2,1fr)}}
+
+/* ===== 본문 그리드 ===== */
+.grid{display:grid;grid-template-columns:376px 1fr;gap:18px;align-items:start;margin-top:18px}
+@media(max-width:880px){.grid{grid-template-columns:1fr}}
+
+/* ===== 카드 ===== */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 2px rgba(20,30,50,.03)}
+.card-h{padding:13px 16px;border-bottom:1px solid var(--line);font-weight:650;font-size:13.5px;display:flex;align-items:center;gap:10px}
+.card-h .n{width:22px;height:22px;border-radius:6px;background:var(--blue-soft);color:var(--blue);font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.card-b{padding:16px}
+.hint{font-size:12px;color:var(--text-3);margin-bottom:13px;line-height:1.55}
+
+label{display:block;font-size:12px;color:var(--text-2);margin-bottom:6px;font-weight:600}
+input,select{width:100%;padding:9px 11px;background:var(--surface);border:1px solid var(--line-2);border-radius:7px;color:var(--text);font-size:13.5px;margin-bottom:13px;font-family:inherit;transition:border-color .13s,box-shadow .13s}
+input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+input[type=file]{padding:7px 9px;background:var(--surface-2);cursor:pointer}
+input[type=file]::file-selector-button{margin-right:10px;padding:5px 11px;border:1px solid var(--line-2);border-radius:5px;background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 16px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .13s,transform .08s;font-family:inherit;width:100%}
+.btn:hover{background:var(--blue-h)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.sec{background:var(--surface);color:var(--text-2);border:1px solid var(--line-2)}
+.btn.sec:hover{background:var(--surface-2);color:var(--text)}
+.btn.sm{padding:8px 12px;font-size:12.5px;width:auto}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* 스텝 표시 */
+.step-status{display:flex;flex-direction:column;gap:7px;margin-top:13px}
+.step-status:empty{display:none}
+.step{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface-2);border-radius:8px;font-size:13px}
+.step .ic{width:18px;height:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;border-radius:50%;font-size:11px}
+.step .ic.wait{background:var(--surface);color:var(--text-3);border:1px solid var(--line-2)}
+.step .ic.ok{background:var(--ok-soft);color:var(--ok)}
+.step .ic.err{background:var(--err-soft);color:var(--err)}
+.step .ic.run{background:var(--blue-soft);color:var(--blue)}
+.step .lbl{flex:1;color:var(--text)}
+.step .val{font-family:var(--mono);font-size:11.5px;color:var(--text-3)}
+
+/* ===== 로그 콘솔 ===== */
+.console{background:var(--surface);border:1px solid var(--line);border-radius:12px;height:calc(100vh - 220px);min-height:440px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 2px rgba(20,30,50,.03)}
+.console-h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.console-h .t{font-size:13px;font-weight:650;display:flex;align-items:center;gap:8px}
+.console-h .t .rec{width:7px;height:7px;border-radius:50%;background:var(--err);animation:pulse2 1.6s infinite}
+@keyframes pulse2{0%,100%{opacity:1}50%{opacity:.3}}
+.console-body{flex:1;overflow-y:auto;padding:8px 0}
+.log{padding:7px 16px;display:flex;gap:11px;align-items:flex-start;border-bottom:1px solid var(--surface-2)}
+.log:hover{background:var(--surface-2)}
+.log .time{font-family:var(--mono);color:var(--text-3);flex-shrink:0;font-size:11.5px;padding-top:1px}
+.log .tag{flex-shrink:0;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.4px;font-family:var(--mono)}
+.log .tag.req{background:var(--blue-soft);color:var(--blue)}
+.log .tag.ok{background:var(--ok-soft);color:var(--ok)}
+.log .tag.err{background:var(--err-soft);color:var(--err)}
+.log .tag.info{background:var(--wait-soft);color:var(--wait)}
+.log .msg{flex:1;word-break:break-word;color:var(--text);font-size:13px}
+.log .msg .detail{color:var(--text-2);display:block;margin-top:3px;white-space:pre-wrap;font-size:11.5px;font-family:var(--mono);line-height:1.65;background:var(--surface-2);padding:7px 10px;border-radius:6px;border-left:2px solid var(--line-2)}
+.console-empty{color:var(--text-3);text-align:center;padding:70px 20px;font-size:13px}
+.console-empty .big{font-size:26px;margin-bottom:10px;opacity:.4}
+
+.spin{width:13px;height:13px;border:2px solid var(--line-2);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title-row">
+      <h1>팩스 시스템 현장 테스트<span class="sub">설치·연결 검증 도구</span></h1>
+      <div class="server-tag" id="serverTag">서버 확인 중…</div>
+    </div>
+    <!-- 시그니처: 시스템 상태 바 -->
+    <div class="status-bar" id="statusBar">
+      <div class="status-cell"><span class="led pending" id="led-app"></span><div class="info"><div class="k">앱 서버</div><div class="v" id="v-app">확인 중</div></div></div>
+      <div class="status-cell"><span class="led pending" id="led-db"></span><div class="info"><div class="k">데이터베이스</div><div class="v" id="v-db">확인 중</div></div></div>
+      <div class="status-cell"><span class="led pending" id="led-fax"></span><div class="info"><div class="k">팩스 서버</div><div class="v" id="v-fax">확인 중</div></div></div>
+      <div class="status-cell"><span class="led pending" id="led-gw"></span><div class="info"><div class="k">게이트웨이</div><div class="v" id="v-gw">미확인</div></div></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- 좌: 컨트롤 -->
+    <div>
+      <div class="card">
+        <div class="card-h"><span class="n">1</span>시스템 상태 점검</div>
+        <div class="card-b">
+          <div class="hint">앱·데이터베이스·팩스 서버가 살아있는지 확인합니다. 상단 표시등에 결과가 반영됩니다.</div>
+          <button class="btn" onclick="checkHealth()">상태 점검 실행</button>
+          <div class="step-status" id="healthSteps"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="n">2</span>회선 · 게이트웨이 점검</div>
+        <div class="card-b">
+          <div class="hint">E1 링크 → 게이트웨이 등록 → T.38 엔진을 점검합니다. <b>게이트웨이·보드 연결 후</b> 실행하세요. 문제 시 조치 방법이 표시됩니다.</div>
+          <button class="btn" onclick="checkLine()">회선 점검 실행</button>
+          <div class="step-status" id="lineSteps"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="n">3</span>실제 발송 테스트</div>
+        <div class="card-b">
+          <div class="hint">실제 서버로 팩스를 보냅니다. 회선 연결 전에는 <b>queued</b>(전달됨)까지 진행됩니다.</div>
+          <label>받는 번호</label>
+          <input id="sendNumber" value="1002" placeholder="1002 (내부 테스트) 또는 실제 번호">
+          <label>보낼 문서</label>
+          <input type="file" id="sendFile">
+          <button class="btn" onclick="sendFax()" id="sendBtn">팩스 발송</button>
+          <div class="step-status" id="sendSteps"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="n">3</span>연속 발송</div>
+        <div class="card-b">
+          <div class="hint">같은 문서를 여러 번 연달아 보내 처리 안정성을 확인합니다.</div>
+          <label>발송 횟수</label>
+          <input id="burstCount" type="number" value="5" min="1" max="50">
+          <button class="btn sec" onclick="burstSend()" id="burstBtn">연속 발송 시작</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><span class="n">4</span>현황 조회</div>
+        <div class="card-b">
+          <div class="btn-grid">
+            <button class="btn sec sm" onclick="checkJobs()">발송 이력</button>
+            <button class="btn sec sm" onclick="checkInbox()">수신함</button>
+            <button class="btn sec sm" onclick="syncJobs()">상태 동기화</button>
+            <button class="btn sec sm" onclick="checkQuick()">건수 요약</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 우: 로그 -->
+    <div class="console">
+      <div class="console-h">
+        <div class="t"><span class="rec"></span>실시간 로그</div>
+        <button class="btn sec sm" onclick="clearLog()">지우기</button>
+      </div>
+      <div class="console-body" id="console">
+        <div class="console-empty"><div class="big">◇</div>테스트를 실행하면 여기에 결과가 기록됩니다.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+const consoleEl = document.getElementById('console');
+let logEmpty = true;
+
+function now(){ return new Date().toTimeString().slice(0,8); }
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function log(tag, msg, detail){
+  if(logEmpty){ consoleEl.innerHTML=''; logEmpty=false; }
+  const el = document.createElement('div');
+  el.className = 'log';
+  el.innerHTML = `<span class="time">${now()}</span>`
+    + `<span class="tag ${tag}">${tag.toUpperCase()}</span>`
+    + `<span class="msg">${esc(msg)}${detail?`<span class="detail">${esc(detail)}</span>`:''}</span>`;
+  consoleEl.appendChild(el);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+function clearLog(){ consoleEl.innerHTML='<div class="console-empty"><div class="big">◇</div>로그를 지웠습니다.</div>'; logEmpty=true; }
+
+async function apiCall(path, opts={}){
+  const t0 = performance.now();
+  try {
+    const r = await fetch(API+path, {credentials:'include', ...opts});
+    const ms = Math.round(performance.now()-t0);
+    const ct = r.headers.get('content-type')||'';
+    const body = ct.includes('json') ? await r.json() : await r.text();
+    return {ok:r.ok, status:r.status, body, ms};
+  } catch(e){
+    return {ok:false, status:0, body:String(e), ms:Math.round(performance.now()-t0)};
+  }
+}
+
+function setSteps(containerId, steps){
+  const el = document.getElementById(containerId);
+  el.innerHTML = steps.map(s=>{
+    const icContent = s.state==='ok'?'✓':s.state==='err'?'✗':s.state==='run'?'<span class="spin"></span>':'○';
+    return `<div class="step"><span class="ic ${s.state}">${icContent}</span>`
+      + `<span class="lbl">${s.label}</span>`
+      + `${s.val?`<span class="val">${esc(s.val)}</span>`:''}</div>`;
+  }).join('');
+}
+
+function setLed(which, state, text){
+  document.getElementById('led-'+which).className = 'led '+state;
+  if(text!==undefined) document.getElementById('v-'+which).textContent = text;
+}
+
+// ---------- 1. 상태 점검 ----------
+async function checkHealth(){
+  setLed('app','pending','확인 중'); setLed('db','pending','확인 중'); setLed('fax','pending','확인 중');
+  setSteps('healthSteps',[
+    {label:'앱 서버', state:'run'},
+    {label:'데이터베이스', state:'wait'},
+    {label:'팩스 서버', state:'wait'},
+  ]);
+  log('req','시스템 상태 점검 시작');
+  const r = await apiCall('/health');
+  if(r.ok && typeof r.body==='object'){
+    const dbOk = r.body.database, faxOk = r.body.fax_server;
+    setLed('app','on','정상');
+    setLed('db', dbOk?'on':'off', dbOk?'연결됨':'끊김');
+    setLed('fax', faxOk?'on':'off', faxOk?'정상':'응답없음');
+    setSteps('healthSteps',[
+      {label:'앱 서버', state:'ok', val:r.ms+'ms'},
+      {label:'데이터베이스', state:dbOk?'ok':'err', val:dbOk?'연결됨':'끊김'},
+      {label:'팩스 서버', state:faxOk?'ok':'err', val:faxOk?'정상':'응답없음'},
+    ]);
+    log(r.body.overall?'ok':'info','상태 점검 완료',
+      `앱 OK · DB ${dbOk?'OK':'실패'} · 팩스서버 ${faxOk?'OK':'응답없음'} · ${r.ms}ms`);
+    if(!faxOk) log('info','팩스 서버가 응답하지 않습니다','faxserver_v6.py 실행 여부와 :8090 포트를 확인하세요. 회선 연결 전이면 정상입니다.');
+  } else {
+    setLed('app','off','연결실패');
+    setSteps('healthSteps',[{label:'앱 서버', state:'err', val:'연결실패'}]);
+    log('err','앱 서버에 연결할 수 없습니다', typeof r.body==='object'?JSON.stringify(r.body):r.body);
+  }
+}
+
+// ---------- 2. 실제 발송 ----------
+async function checkLine(){
+  setSteps('lineSteps',[{label:'회선 점검 실행 중', state:'run'}]);
+  log('req','회선·게이트웨이 점검 시작');
+  const r = await apiCall('/api/diag/line');
+  if(r.ok && r.body && Array.isArray(r.body.checks)){
+    setSteps('lineSteps', r.body.checks.map(c=>({
+      label: c.label,
+      state: c.ok ? 'ok' : 'err',
+      val: c.detail + (c.hint ? ' · '+c.hint : ''),
+    })));
+    log(r.body.overall==='ok'?'ok':'err', '회선 점검 완료', r.body.summary);
+  } else {
+    setSteps('lineSteps',[{label:'회선 점검 실패', state:'err', val:'팩스 서버 응답 없음'}]);
+    log('err','회선 점검 실패','팩스 서버에 연결할 수 없습니다');
+  }
+}
+
+async function sendFax(){
+  const number = document.getElementById('sendNumber').value.trim();
+  const fileInput = document.getElementById('sendFile');
+  if(!number){ log('err','받는 번호를 입력하세요'); return; }
+  if(!fileInput.files.length){ log('err','보낼 문서를 선택하세요'); return; }
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  setSteps('sendSteps',[
+    {label:'발송 요청 전송', state:'run'},
+    {label:'서버 접수', state:'wait'},
+    {label:'큐 등록', state:'wait'},
+  ]);
+  log('req',`팩스 발송 요청 → ${number}`, `파일: ${fileInput.files[0].name}`);
+
+  const fd = new FormData();
+  fd.append('number', number);
+  fd.append('to_name', '현장테스트');
+  fd.append('file', fileInput.files[0]);
+  fd.append('cover', 'false');
+
+  const r = await apiCall('/api/fax/send', {method:'POST', body:fd});
+  btn.disabled = false;
+
+  if(r.ok && r.body.ok){
+    const st = r.body.status;
+    setSteps('sendSteps',[
+      {label:'발송 요청 전송', state:'ok', val:r.ms+'ms'},
+      {label:'서버 접수', state:'ok', val:'job #'+r.body.job_id},
+      {label:'큐 등록', state:(st==='sent'||st==='queued')?'ok':'err', val:st},
+    ]);
+    log('ok',`발송 접수됨 (job #${r.body.job_id})`,
+      `상태 ${st} · ${r.body.pages}페이지 · ${r.ms}ms\n`
+      + (st==='queued'?'queued = 팩스 서버로 전달 완료. 실제 전송은 회선을 통해 진행됩니다.':
+         st==='sent'?'sent = 전송 완료.':
+         st==='retry_wait'?'일시 실패 — 자동 재시도가 예약되었습니다.':''));
+    log('info','실제 전송 결과는 [상태 동기화] 또는 [발송 이력]으로 확인하세요');
+  } else {
+    setSteps('sendSteps',[{label:'발송 요청 전송', state:'err', val:r.status}]);
+    const detail = typeof r.body==='object' ? (r.body.message||r.body.detail||JSON.stringify(r.body)) : r.body;
+    log('err',`발송 실패 (${r.status})`, detail);
+  }
+}
+
+// ---------- 3. 연속 발송 ----------
+async function burstSend(){
+  const count = parseInt(document.getElementById('burstCount').value)||5;
+  const number = document.getElementById('sendNumber').value.trim() || '1002';
+  const fileInput = document.getElementById('sendFile');
+  if(!fileInput.files.length){ log('err','먼저 [실제 발송 테스트]에서 파일을 선택하세요'); return; }
+
+  const btn = document.getElementById('burstBtn');
+  btn.disabled = true;
+  log('req',`연속 발송 시작 — ${count}건 → ${number}`);
+  let ok=0, fail=0; const times=[];
+  for(let i=1;i<=count;i++){
+    const fd = new FormData();
+    fd.append('number', number);
+    fd.append('to_name', `연속테스트${i}`);
+    fd.append('file', fileInput.files[0]);
+    fd.append('cover', 'false');
+    const r = await apiCall('/api/fax/send', {method:'POST', body:fd});
+    if(r.ok && r.body.ok){ ok++; times.push(r.ms); log('ok',`[${i}/${count}] 접수 job #${r.body.job_id}`, `${r.body.status} · ${r.ms}ms`); }
+    else { fail++; log('err',`[${i}/${count}] 실패`, typeof r.body==='object'?JSON.stringify(r.body):r.body); }
+  }
+  btn.disabled = false;
+  const avg = times.length?Math.round(times.reduce((a,b)=>a+b,0)/times.length):0;
+  log('info','연속 발송 완료', `성공 ${ok} · 실패 ${fail} · 평균 응답 ${avg}ms`);
+}
+
+// ---------- 4. 현황 조회 ----------
+async function checkJobs(){
+  log('req','발송 이력 조회');
+  const r = await apiCall('/api/fax/jobs-filtered');
+  if(r.ok && Array.isArray(r.body)){
+    const lines = r.body.slice(0,8).map(j=>`#${j.id} ${j.to_number} · ${j.status} · ${j.pages||0}p`).join('\n');
+    log('ok',`발송 이력 ${r.body.length}건 (최근 8건)`, lines||'(없음)');
+  } else log('err','조회 실패', typeof r.body==='object'?JSON.stringify(r.body):r.body);
+}
+async function checkInbox(){
+  log('req','수신함 조회');
+  const r = await apiCall('/api/receive/inbox');
+  if(r.ok && Array.isArray(r.body)){
+    const lines = r.body.slice(0,8).map(x=>`#${x.id} ${x.from_number||'?'} → ${x.to_number||'?'} · ${x.pages||0}p ${x.is_read?'':'(안읽음)'}`).join('\n');
+    log('ok',`수신 팩스 ${r.body.length}건 (최근 8건)`, lines||'(없음)');
+  } else log('err','조회 실패', typeof r.body==='object'?JSON.stringify(r.body):r.body);
+}
+async function syncJobs(){
+  log('req','팩스 서버와 상태 동기화');
+  const r = await apiCall('/api/fax/jobs/sync', {method:'POST'});
+  if(r.ok) log('ok','동기화 완료', r.body.message||JSON.stringify(r.body));
+  else log('err','동기화 실패', typeof r.body==='object'?JSON.stringify(r.body):r.body);
+}
+async function checkQuick(){
+  log('req','상태별 건수 요약');
+  const r = await apiCall('/api/fax/jobs/stats-quick');
+  if(r.ok && typeof r.body==='object'){
+    const lines = Object.entries(r.body).map(([k,v])=>`${k}: ${v}건`).join('\n');
+    log('ok','상태별 건수', lines||'(없음)');
+  } else log('err','조회 실패', typeof r.body==='object'?JSON.stringify(r.body):r.body);
+}
+
+window.addEventListener('load', ()=>{
+  document.getElementById('serverTag').textContent = location.origin || '현재 서버';
+  checkHealth();
+});
+</script>
+</body>
+</html>

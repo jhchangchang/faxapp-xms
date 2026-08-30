@@ -1,0 +1,20 @@
+[Unit]
+Description=FaxServer - 팩스 엔진 (faxserver_v6.py)
+# FreeSWITCH가 뜬 후 시작 (ESL 연결 필요)
+After=network.target freeswitch.service
+Wants=freeswitch.service
+
+[Service]
+Type=simple
+User=root
+# 팩스 서버 위치 (faxserver_v6.py, faxguard.py, faxdiag.py 있는 곳)
+WorkingDirectory=/opt/faxapp
+ExecStart=/usr/bin/python3 /opt/faxapp/faxserver_v6.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=faxserver
+
+[Install]
+WantedBy=multi-user.target

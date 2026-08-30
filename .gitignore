@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.tif
+*.tiff
+*.pdf
+*.log
+*.pcap
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.rpm
+bundle/
+venv/
+.venv/
+uploads/

@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FaxApp</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{
+  --bg:#fbfcfd;--surface:#ffffff;--surface-2:#f6f8fa;--border:#e8ecf1;--border-strong:#d8dee6;
+  --text:#111826;--text-2:#5b6675;--text-3:#98a2b3;
+  --accent:#4f46e5;--accent-weak:#eef0fe;--accent-hover:#4338ca;
+  --ok:#12805c;--ok-weak:#e7f4ef;--err:#c0362c;--err-weak:#fbecea;--wait:#b26b00;--wait-weak:#fbf1e0;
+  --mono:'SF Mono','JetBrains Mono','Roboto Mono',ui-monospace,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
+  --r:10px;--r-sm:7px;--r-lg:14px;
+  --sh-sm:0 1px 2px rgba(17,24,38,.05);--sh:0 1px 3px rgba(17,24,38,.08),0 1px 2px rgba(17,24,38,.04);--sh-lg:0 8px 28px rgba(17,24,38,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--text)}
+svg{display:block}
+::selection{background:var(--accent-weak)}
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.75;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.ic-sm{width:15px;height:15px}
+.auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at 30% 20%,#f0f3f8,#fbfcfd)}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:40px 38px;width:100%;max-width:380px;box-shadow:var(--sh-lg)}
+.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.auth-logo .mark{width:38px;height:38px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center}
+.auth-logo .mark svg{width:20px;height:20px;stroke:#fff;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.auth h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.auth .sub{color:var(--text-3);font-size:13px;margin-bottom:28px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:7px}
+.inp{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);transition:border-color .15s,box-shadow .15s}
+.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.btn-primary{width:100%;padding:12px;background:var(--accent);color:#fff;border-radius:var(--r-sm);font-size:14px;font-weight:600;transition:background .15s}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-primary:disabled{opacity:.6;cursor:default}
+.auth-err{background:var(--err-weak);color:var(--err);padding:11px 13px;border-radius:var(--r-sm);font-size:12.5px;font-weight:500;margin-bottom:16px}
+.shell{display:flex;min-height:100vh}
+.side{width:224px;background:var(--surface);border-right:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.side-top{padding:20px 20px 16px;display:flex;align-items:center;gap:11px}
+.side-top .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.side-top .mark svg{width:17px;height:17px;stroke:#fff;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.side-top .nm{font-size:15.5px;font-weight:700;letter-spacing:-.3px}
+.nav{padding:8px 12px;flex:1;overflow-y:auto}
+.nav-sec{font-size:11px;color:var(--text-3);font-weight:600;letter-spacing:.4px;padding:14px 10px 6px;text-transform:uppercase}
+.nav-sec:first-child{padding-top:4px}
+.nav-a{display:flex;align-items:center;gap:11px;padding:8.5px 10px;border-radius:var(--r-sm);color:var(--text-2);font-weight:500;font-size:13.5px;cursor:pointer;transition:background .12s,color .12s}
+.nav-a:hover{background:var(--surface-2);color:var(--text)}
+.nav-a.on{background:var(--accent-weak);color:var(--accent);font-weight:600}
+.nav-a .lbl{flex:1}
+.nav-a .cnt{font-size:11.5px;font-weight:600;color:var(--text-3);font-family:var(--mono)}
+.nav-a.on .cnt{color:var(--accent)}
+.side-user{padding:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.avatar{width:34px;height:34px;border-radius:8px;background:var(--accent-weak);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.side-user .who{flex:1;min-width:0}
+.side-user .who .n{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side-user .who .r{font-size:11.5px;color:var(--text-3)}
+.icon-btn{width:32px;height:32px;border-radius:var(--r-sm);color:var(--text-3);display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s}
+.icon-btn:hover{background:var(--surface-2);color:var(--text)}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.head{height:60px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:var(--surface)}
+.head h2{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.head .head-sub{font-size:12.5px;color:var(--text-3);margin-top:1px}
+.content{padding:28px;flex:1;overflow-y:auto;max-width:1180px;width:100%}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-sm);margin-bottom:20px;overflow:hidden}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.card-t{font-size:14px;font-weight:650;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
+.card-t .muted{color:var(--text-3);font-weight:500}
+.card-b{padding:18px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(172px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:17px 18px;box-shadow:var(--sh-sm)}
+.stat .lbl{font-size:12px;color:var(--text-2);font-weight:550;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.stat .lbl .dot{width:7px;height:7px;border-radius:2px;background:var(--accent)}
+.stat .lbl .dot.ok{background:var(--ok)}.stat .lbl .dot.err{background:var(--err)}.stat .lbl .dot.wait{background:var(--wait)}
+.stat .num{font-size:29px;font-weight:700;letter-spacing:-1.2px;line-height:1}
+.stat .meta{font-size:12px;color:var(--text-3);margin-top:8px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl thead th{text-align:left;padding:10px 16px;font-size:11.5px;color:var(--text-3);font-weight:600;letter-spacing:.2px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl tbody td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr{transition:background .1s}
+.tbl tbody tr:hover{background:var(--surface-2)}
+.tbl .num{text-align:right}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+.b-ok{background:var(--ok-weak);color:var(--ok)}
+.b-err{background:var(--err-weak);color:var(--err)}
+.b-wait{background:var(--wait-weak);color:var(--wait)}
+.b-dim{background:var(--surface-2);color:var(--text-3)}
+.b-send{background:var(--accent-weak);color:var(--accent)}
+.role{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600}
+.role-admin{background:var(--err-weak);color:var(--err)}
+.role-manager{background:var(--wait-weak);color:var(--wait)}
+.role-user{background:var(--accent-weak);color:var(--accent)}
+.dim{color:var(--text-3)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-2);border-radius:var(--r-sm);font-size:13px;font-weight:550;transition:all .13s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-weak)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:disabled:hover{border-color:var(--border-strong);color:var(--text-2);background:var(--surface)}
+.btn-a{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-a:hover{background:var(--accent-hover);color:#fff;border-color:var(--accent-hover)}
+.btn-s{padding:6px 11px;font-size:12.5px}
+.btn-x{padding:5px 10px;font-size:12px}
+.btn-err:hover{border-color:var(--err);color:var(--err);background:var(--err-weak)}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-row{display:flex;gap:7px;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px;gap:2px}
+.seg button{padding:5px 12px;font-size:12.5px;font-weight:550;color:var(--text-2);border-radius:5px;transition:all .12s}
+.seg button.on{background:var(--surface);color:var(--accent);box-shadow:var(--sh-sm);font-weight:600}
+.frm{margin-bottom:15px}
+.frm label{display:block;font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:7px}
+.frm .inp,.frm select,.frm textarea{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);transition:border-color .15s,box-shadow .15s}
+.frm .inp:focus,.frm select:focus,.frm textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.frm textarea{resize:vertical;min-height:60px}
+.drop{border:1.5px dashed var(--border-strong);border-radius:var(--r);padding:26px;text-align:center;color:var(--text-3);background:var(--surface-2);cursor:pointer;transition:all .15s;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.drop:hover{border-color:var(--accent);color:var(--accent)}
+.drop.has{border-color:var(--ok);color:var(--ok);border-style:solid;background:var(--ok-weak)}
+.check{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:550;cursor:pointer;color:var(--text-2)}
+.check input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.empty{padding:56px 20px;text-align:center;color:var(--text-3)}
+.empty svg{width:34px;height:34px;stroke:var(--text-3);stroke-width:1.5;fill:none;stroke-linecap:round;stroke-linejoin:round;margin:0 auto 14px;opacity:.6}
+.empty .t{font-size:14px;font-weight:600;color:var(--text-2)}
+.empty .d{font-size:13px;margin-top:5px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:12px 20px;border-radius:var(--r-sm);font-size:13.5px;font-weight:550;box-shadow:var(--sh-lg);z-index:300;display:flex;align-items:center;gap:9px;animation:toast .25s cubic-bezier(.16,1,.3,1)}
+.toast svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.toast.ok{background:var(--ok)}.toast.err{background:var(--err)}
+@keyframes toast{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.chart{display:flex;align-items:flex-end;gap:8px;height:180px;padding:16px 4px 0}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.chart-bars{width:100%;display:flex;gap:3px;align-items:flex-end;height:100%;justify-content:center}
+.chart-bar{width:44%;border-radius:3px 3px 0 0;min-height:2px;transition:height .4s cubic-bezier(.16,1,.3,1)}
+.chart-bar.s{background:var(--accent)}
+.chart-bar.r{background:#a5b4fc}
+.chart-x{font-size:11px;color:var(--text-3);font-family:var(--mono);white-space:nowrap}
+.chart-legend{display:flex;gap:16px;font-size:12px;color:var(--text-2)}
+.chart-legend span{display:flex;align-items:center;gap:6px}
+.chart-legend i{width:10px;height:10px;border-radius:3px}
+.scrim{position:fixed;inset:0;background:rgba(17,24,38,.45);backdrop-filter:blur(2px);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;animation:fade .15s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-lg);width:100%;max-width:720px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.modal-h{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--border)}
+.modal-h .t{font-size:14.5px;font-weight:650}
+.modal-b{padding:20px;overflow-y:auto;background:var(--surface-2)}
+.pv-img{max-width:100%;display:block;margin:0 auto;border:1px solid var(--border);border-radius:var(--r-sm);background:#fff;box-shadow:var(--sh)}
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.center-load{display:flex;justify-content:center;padding:60px}
+.grid-2{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start}
+.grid-side{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start}
+@media(max-width:900px){.grid-2,.grid-side{grid-template-columns:1fr}.side{width:64px}.side-top .nm,.nav-sec,.nav-a .lbl,.nav-a .cnt,.side-user .who,.side-user .icon-btn{display:none}}
+.inline-edit{display:flex;gap:5px;align-items:center}
+.inline-edit input{padding:4px 8px;border:1px solid var(--border-strong);border-radius:5px;font-size:12.5px;width:130px}
+.link{color:var(--accent);cursor:pointer;font-weight:550}
+.link:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback}=React;
+const I={
+  bell:<svg viewBox="0 0 24 24" className="ic"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  clock:<svg viewBox="0 0 24 24" className="ic"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>,
+  fax:<svg viewBox="0 0 24 24" className="ic"><path d="M6 9V3h12v6M6 18h12v3H6zM4 9h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path d="M8 13h.01M12 13h.01"/></svg>,
+  grid:<svg viewBox="0 0 24 24" className="ic"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>,
+  send:<svg viewBox="0 0 24 24" className="ic"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
+  list:<svg viewBox="0 0 24 24" className="ic"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>,
+  inbox:<svg viewBox="0 0 24 24" className="ic"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>,
+  book:<svg viewBox="0 0 24 24" className="ic"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
+  chart:<svg viewBox="0 0 24 24" className="ic"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>,
+  users:<svg viewBox="0 0 24 24" className="ic"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  building:<svg viewBox="0 0 24 24" className="ic"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>,
+  power:<svg viewBox="0 0 24 24" className="ic"><path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/></svg>,
+  refresh:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 21v-5h5"/></svg>,
+  eye:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>,
+  x:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M18 6 6 18M6 6l12 12"/></svg>,
+  trash:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+  check:<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>,
+  plus:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M12 5v14M5 12h14"/></svg>,
+  file:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>,
+  chevL:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M15 18l-6-6 6-6"/></svg>,
+  chevR:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M9 18l6-6-6-6"/></svg>,
+  alert:<svg viewBox="0 0 24 24" className="ic"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>,
+  upload:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>,
+  download:<svg viewBox="0 0 24 24" className="ic ic-sm"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
+  clip:<svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:'currentColor',strokeWidth:1.75,fill:'none',strokeLinecap:'round',strokeLinejoin:'round'}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>,
+};
+const API='';
+async function api(path,opts={}){
+  const r=await fetch(API+path,{credentials:'include',headers:opts.body&&!(opts.body instanceof FormData)?{'Content-Type':'application/json'}:{},...opts});
+  if(!r.ok){const e=await r.json().catch(()=>({detail:r.statusText}));throw new Error(e.detail||'요청을 처리하지 못했습니다');}
+  return r.status===204?null:r.json();
+}
+const J=o=>JSON.stringify(o);
+const fmt=ts=>{if(!ts)return'-';const s=String(ts);return s.slice(5,16).replace('T',' ');};
+function Loading(){return <div className="center-load"><span className="spinner"/></div>;}
+function Empty({icon,t,d}){return <div className="empty">{icon}<div className="t">{t}</div>{d&&<div className="d">{d}</div>}</div>;}
+function Login({onLogin}){
+  const [u,setU]=useState(''),[p,setP]=useState(''),[err,setErr]=useState(''),[busy,setBusy]=useState(false);
+  const submit=async()=>{setErr('');setBusy(true);try{const r=await api('/api/auth/login',{method:'POST',body:J({username:u,password:p})});onLogin(r.user);}catch(e){setErr(e.message);}finally{setBusy(false);}};
+  return <div className="auth"><div className="auth-card">
+    <div className="auth-logo"><div className="mark">{I.fax}</div><h1>FaxApp</h1></div>
+    <div className="sub">팩스 업무 시스템에 로그인하세요</div>
+    {err&&<div className="auth-err">{err}</div>}
+    <div className="field"><label>아이디</label><input className="inp" value={u} onChange={e=>setU(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} autoFocus/></div>
+    <div className="field"><label>비밀번호</label><input className="inp" type="password" value={p} onChange={e=>setP(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()}/></div>
+    <button className="btn-primary" onClick={submit} disabled={busy}>{busy?'로그인 중…':'로그인'}</button>
+  </div></div>;
+}
+function Dashboard(){
+  const [s,setS]=useState(null),[daily,setDaily]=useState(null);
+  useEffect(()=>{api('/api/stats/summary').then(setS).catch(()=>{});api('/api/stats/daily?days=14').then(setDaily).catch(()=>setDaily({sent:[],received:[]}));},[]);
+  if(!s)return <Loading/>;
+  return <div>
+    <div className="stats-grid">
+      <div className="stat"><div className="lbl"><span className="dot ok"/>전송 성공률</div><div className="num">{s.success_rate}%</div><div className="meta">전체 {s.sent.total}건 기준</div></div>
+      <div className="stat"><div className="lbl"><span className="dot"/>오늘 발송</div><div className="num">{s.today.sent}</div><div className="meta">성공 {s.today.ok}건</div></div>
+      <div className="stat"><div className="lbl"><span className="dot wait"/>발송 대기</div><div className="num">{s.sent.in_progress}</div><div className="meta">처리 대기 중</div></div>
+      <div className="stat"><div className="lbl"><span className="dot err"/>안읽은 수신</div><div className="num">{s.received.unread}</div><div className="meta">전체 {s.received.total}건 수신</div></div>
+    </div>
+    <div className="card"><div className="card-h"><div className="card-t">최근 2주 송수신 추이</div>
+      <div className="chart-legend"><span><i style={{background:'var(--accent)'}}/>발송</span><span><i style={{background:'#a5b4fc'}}/>수신</span></div></div>
+      <div className="card-b"><DailyChart daily={daily}/></div></div>
+  </div>;
+}
+function DailyChart({daily}){
+  if(!daily)return <Loading/>;
+  const days={};
+  (daily.sent||[]).forEach(d=>{const k=String(d.day).slice(5,10);days[k]=days[k]||{s:0,r:0};days[k].s=d.cnt;});
+  (daily.received||[]).forEach(d=>{const k=String(d.day).slice(5,10);days[k]=days[k]||{s:0,r:0};days[k].r=d.cnt;});
+  const keys=Object.keys(days).sort();
+  if(!keys.length)return <Empty icon={I.chart} t="데이터 없음" d="송수신이 쌓이면 추이가 표시됩니다"/>;
+  const max=Math.max(1,...keys.map(k=>Math.max(days[k].s,days[k].r)));
+  return <div className="chart">{keys.map(k=><div className="chart-col" key={k}>
+    <div className="chart-bars"><div className="chart-bar s" style={{height:(days[k].s/max*100)+'%'}} title={'발송 '+days[k].s}/><div className="chart-bar r" style={{height:(days[k].r/max*100)+'%'}} title={'수신 '+days[k].r}/></div>
+    <div className="chart-x">{k}</div></div>)}</div>;
+}
+function Send({toast}){
+  const [mode,setMode]=useState('single');
+  const [number,setNumber]=useState(''),[toName,setToName]=useState(''),[numbers,setNumbers]=useState('');
+  const [file,setFile]=useState(null),[busy,setBusy]=useState(false);
+  const [useCover,setUseCover]=useState(false),[title,setTitle]=useState(''),[memo,setMemo]=useState('');
+  const [coverTpl,setCoverTpl]=useState('standard'),[tpls,setTpls]=useState([]);
+  const [useSchedule,setUseSchedule]=useState(false),[schedAt,setSchedAt]=useState('');
+  const [contacts,setContacts]=useState([]),[groups,setGroups]=useState([]);
+  const [preview,setPreview]=useState(null),[pvBusy,setPvBusy]=useState(false);
+  const showPreview=async()=>{
+    if(!file)return toast('먼저 문서를 선택하세요','err');
+    setPvBusy(true);
+    try{const fd=new FormData();fd.append('file',file);
+      const r=await fetch(API+'/api/preview/preflight',{method:'POST',credentials:'include',body:fd});
+      if(!r.ok)throw new Error('미리보기를 만들 수 없습니다');
+      const blob=await r.blob();setPreview(URL.createObjectURL(blob));
+    }catch(e){toast(e.message,'err');}finally{setPvBusy(false);}
+  };
+  useEffect(()=>{api('/api/contacts').then(setContacts).catch(()=>{});api('/api/contacts/groups').then(setGroups).catch(()=>{});api('/api/fax/cover-templates').then(setTpls).catch(()=>{});},[]);
+  const send=async()=>{
+    if(!file)return toast('보낼 문서를 선택하세요','err');
+    if(mode==='single'&&!number)return toast('받는 번호를 입력하세요','err');
+    if(mode==='broadcast'&&!numbers.trim())return toast('받는 번호를 입력하세요','err');
+    if(useSchedule&&!schedAt)return toast('예약 시각을 선택하세요','err');
+    setBusy(true);
+    try{const fd=new FormData();fd.append('file',file);
+      if(mode==='single'){fd.append('number',number);fd.append('to_name',toName);fd.append('cover',useCover);fd.append('title',title);fd.append('memo',memo);fd.append('cover_template',coverTpl);
+        if(useSchedule&&schedAt)fd.append('scheduled_at',schedAt);
+        const r=await api('/api/fax/send',{method:'POST',body:fd});
+        toast(r.status==='scheduled'?r.message:('발송 요청 완료 · '+r.pages+'페이지'+(r.cover_used?' · 표지 포함':'')),'ok');
+      }else{fd.append('numbers',numbers);const r=await api('/api/fax/broadcast',{method:'POST',body:fd});toast('동보전송 요청 완료 · '+r.queued+'/'+r.total+'건','ok');}
+      setNumber('');setToName('');setNumbers('');setFile(null);setTitle('');setMemo('');setUseCover(false);setUseSchedule(false);setSchedAt('');
+    }catch(e){toast(e.message,'err');}finally{setBusy(false);}
+  };
+  const pickContact=v=>{if(!v)return;const c=contacts.find(x=>x.id==v);if(!c)return;if(mode==='single'){setNumber(c.fax_number);setToName(c.name);}else{setNumbers(n=>n?n+', '+c.fax_number:c.fax_number);}};
+  const pickGroup=v=>{if(!v)return;api('/api/contacts/groups/'+v+'/members').then(ms=>setNumbers(ms.map(m=>m.fax_number).join(', '))).catch(()=>{});};
+  return <div className="card" style={{maxWidth:600}}>
+    <div className="card-h"><div className="card-t">팩스 보내기</div>
+      <div className="seg"><button className={mode==='single'?'on':''} onClick={()=>setMode('single')}>단건</button><button className={mode==='broadcast'?'on':''} onClick={()=>setMode('broadcast')}>동보전송</button></div></div>
+    <div className="card-b">
+      {mode==='single'?<>
+        {contacts.length>0&&<div className="frm"><label>주소록에서 선택</label><select onChange={e=>pickContact(e.target.value)} defaultValue=""><option value="">직접 입력</option>{contacts.map(c=><option key={c.id} value={c.id}>{c.name} · {c.fax_number}</option>)}</select></div>}
+        <div className="frm"><label>받는 번호</label><input className="inp" value={number} onChange={e=>setNumber(e.target.value)} placeholder="02-1234-5678"/></div>
+        <div className="frm"><label>받는 사람 <span className="dim">(선택)</span></label><input className="inp" value={toName} onChange={e=>setToName(e.target.value)} placeholder="○○상사 김부장"/></div>
+      </>:<>
+        <div style={{display:'flex',gap:12}}>
+          {contacts.length>0&&<div className="frm" style={{flex:1}}><label>연락처 추가</label><select onChange={e=>{pickContact(e.target.value);e.target.value='';}} defaultValue=""><option value="">선택</option>{contacts.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
+          {groups.length>0&&<div className="frm" style={{flex:1}}><label>그룹 불러오기</label><select onChange={e=>{pickGroup(e.target.value);e.target.value='';}} defaultValue=""><option value="">선택</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name} ({g.member_count})</option>)}</select></div>}
+        </div>
+        <div className="frm"><label>받는 번호 <span className="dim">(콤마로 구분)</span></label><textarea value={numbers} onChange={e=>setNumbers(e.target.value)} placeholder="02-111-1111, 02-222-2222"/></div>
+      </>}
+      <div className="frm"><label>보낼 문서</label>
+        <label className={'drop'+(file?' has':'')}>{file?I.file:I.clip}<span>{file?file.name:'PDF · Office · 한글 · 이미지 파일'}</span>
+          <input type="file" style={{display:'none'}} onChange={e=>setFile(e.target.files[0])}/></label>
+        {file&&<button className="btn btn-s" onClick={showPreview} disabled={pvBusy} style={{marginTop:8}}>{I.eye}{pvBusy?'생성 중…':'발송 전 미리보기'}</button>}</div>
+      {mode==='single'&&<>
+        <label className="check" style={{marginBottom:useCover?14:18}}><input type="checkbox" checked={useCover} onChange={e=>setUseCover(e.target.checked)}/>표지 첨부</label>
+        {useCover&&<div style={{background:'var(--surface-2)',padding:16,borderRadius:'var(--r-sm)',marginBottom:18}}>
+          {tpls.length>0&&<div className="frm" style={{marginBottom:12}}><label>표지 스타일</label>
+            <div className="seg" style={{width:'100%'}}>{tpls.map(t=><button key={t.id} type="button" className={coverTpl===t.id?'on':''} onClick={()=>setCoverTpl(t.id)} title={t.desc} style={{flex:1}}>{t.name}</button>)}</div></div>}
+          <div className="frm" style={{marginBottom:12}}><label>제목</label><input className="inp" value={title} onChange={e=>setTitle(e.target.value)} placeholder="계약서 송부의 건"/></div>
+          <div className="frm" style={{marginBottom:0}}><label>전달 내용</label><textarea value={memo} onChange={e=>setMemo(e.target.value)} placeholder="검토 후 회신 부탁드립니다."/></div></div>}
+        <label className="check" style={{marginBottom:useSchedule?14:18}}><input type="checkbox" checked={useSchedule} onChange={e=>setUseSchedule(e.target.checked)}/>발송 예약</label>
+        {useSchedule&&<div style={{background:'var(--surface-2)',padding:16,borderRadius:'var(--r-sm)',marginBottom:18}}>
+          <div className="frm" style={{marginBottom:0}}><label>예약 발송 시각</label><input className="inp" type="datetime-local" value={schedAt} onChange={e=>setSchedAt(e.target.value)}/>
+            <div className="dim" style={{fontSize:12,marginTop:6}}>지정한 시각에 자동으로 발송됩니다.</div></div></div>}
+      </>}
+      <button className="btn btn-a" onClick={send} disabled={busy} style={{width:'100%',justifyContent:'center',padding:12}}>{busy?'전송 중…':(useSchedule?'발송 예약':'팩스 보내기')}</button>
+    </div>
+    {preview&&<div className="scrim" onClick={()=>{URL.revokeObjectURL(preview);setPreview(null);}}><div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:640}}>
+      <div className="modal-h"><div className="card-t">발송 전 미리보기 <span className="dim" style={{fontWeight:400,fontSize:12}}>· 팩스로 나갈 실제 모습</span></div><button className="btn btn-x" onClick={()=>{URL.revokeObjectURL(preview);setPreview(null);}}>{I.x}</button></div>
+      <div className="modal-b" style={{textAlign:'center',background:'var(--surface-2,#f7f9fc)'}}>
+        <img src={preview} style={{maxWidth:'100%',border:'1px solid var(--line,#ddd)',borderRadius:4}}/>
+        <div className="dim" style={{fontSize:12,marginTop:10}}>흑백 팩스 화질로 변환된 결과입니다. 실제 발송도 이 형태로 나갑니다.</div>
+      </div></div></div>}
+  </div>;
+}
+const ST={sent:['b-ok','완료'],failed:['b-err','실패'],queued:['b-wait','대기'],pending:['b-wait','준비'],sending:['b-wait','전송중'],retry_wait:['b-wait','재시도 대기'],cancelled:['b-dim','취소']};
+function SendHistory({toast}){
+  const [jobs,setJobs]=useState(null),[pv,setPv]=useState(null),[filter,setFilter]=useState(''),[stats,setStats]=useState({}),[busy,setBusy]=useState(false);
+  const load=()=>{api('/api/fax/jobs-filtered'+(filter?'?status='+filter:'')).then(setJobs).catch(()=>setJobs([]));api('/api/fax/jobs/stats-quick').then(setStats).catch(()=>{});};
+  useEffect(()=>{load();},[filter]);
+  const act=async(fn,msg)=>{try{const r=await fn();toast(r.message||msg,'ok');load();}catch(e){toast(e.message,'err');}};
+  const sync=async()=>{setBusy(true);await act(()=>api('/api/fax/jobs/sync',{method:'POST'}),'동기화 완료');setBusy(false);};
+  const cancelAll=()=>{if(confirm('대기 중인 발송을 모두 취소할까요?'))act(()=>api('/api/fax/jobs/cancel-pending',{method:'POST'}),'취소 완료');};
+  const pending=(stats.queued||0)+(stats.pending||0);
+  const retryWait=stats.retry_wait||0;
+  const FILT=[['','전체'],['sent','완료'],['queued','대기'],['retry_wait','재시도'],['failed','실패'],['cancelled','취소']];
+  if(!jobs)return <Loading/>;
+  return <div>
+    <div className="stats-grid" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+      <div className="stat"><div className="lbl"><span className="dot ok"/>완료</div><div className="num">{stats.sent||0}</div></div>
+      <div className="stat"><div className="lbl"><span className="dot wait"/>대기</div><div className="num">{pending}</div></div>
+      <div className="stat"><div className="lbl"><span className="dot wait"/>재시도 대기</div><div className="num">{retryWait}</div></div>
+      <div className="stat"><div className="lbl"><span className="dot err"/>실패</div><div className="num">{stats.failed||0}</div></div>
+      <div className="stat"><div className="lbl"><span className="dot"/>취소</div><div className="num">{stats.cancelled||0}</div></div>
+    </div>
+    <div className="card"><div className="card-h">
+      <div className="seg">{FILT.map(([v,l])=><button key={v} className={filter===v?'on':''} onClick={()=>setFilter(v)}>{l}</button>)}</div>
+      <div className="btn-row">
+        <button className="btn btn-s" onClick={sync} disabled={busy}>{I.refresh}{busy?'동기화 중':'상태 동기화'}</button>
+        {retryWait>0&&<button className="btn btn-s" onClick={()=>act(()=>api('/api/fax/retry-now',{method:'POST'}),'재시도 실행됨')}>지금 재시도</button>}
+        {pending>0&&<button className="btn btn-s btn-err" onClick={cancelAll}>대기 전체취소</button>}
+        {(stats.failed||0)>0&&<button className="btn btn-s" onClick={()=>act(()=>api('/api/fax/jobs/resend-failed',{method:'POST'}),'재전송 요청됨')}>실패 재전송</button>}
+        <a className="btn btn-s" href={API+'/api/data/export/send-history'+(filter?'?status='+filter:'')} download>{I.download}엑셀</a>
+      </div></div>
+      {jobs.length?<table className="tbl"><thead><tr><th>시각</th><th>받는번호</th><th>받는사람</th><th>파일</th><th className="num">쪽</th><th>상태</th><th></th></tr></thead>
+      <tbody>{jobs.map(j=>{const a=ST[j.status]||['b-dim',j.status];return <tr key={j.id}>
+        <td className="mono dim">{fmt(j.created_at)}</td><td className="mono">{j.to_number}</td><td>{j.to_name||'-'}</td>
+        <td className="dim">{j.file_name||'-'}{j.cover_used&&<span style={{marginLeft:6,color:'var(--accent)'}}>표지</span>}</td>
+        <td className="num mono">{j.pages||0}</td><td><span className={'badge '+a[0]}>{a[1]}</span></td>
+        <td><div className="btn-row" style={{justifyContent:'flex-end'}}>
+          <button className="btn btn-x" onClick={()=>setPv({url:API+'/api/preview/job/'+j.id,title:'발송 #'+j.id})}>{I.eye}</button>
+          {(j.status==='queued'||j.status==='pending')&&<button className="btn btn-x btn-err" onClick={()=>act(()=>api('/api/fax/jobs/'+j.id+'/cancel',{method:'POST'}),'취소됨')}>취소</button>}
+          {(j.status==='failed'||j.status==='cancelled')&&<button className="btn btn-x" onClick={()=>act(()=>api('/api/fax/jobs/'+j.id+'/resend',{method:'POST'}),'재전송됨')}>재전송</button>}
+        </div></td></tr>;})}</tbody></table>:<Empty icon={I.send} t="발송 이력이 없습니다" d="팩스를 보내면 여기에 기록됩니다"/>}
+    </div>
+    {pv&&<PreviewModal {...pv} onClose={()=>setPv(null)}/>}
+  </div>;
+}
+function Inbox({toast,user}){
+  const [list,setList]=useState(null),[pv,setPv]=useState(null),[memoId,setMemoId]=useState(null),[memoText,setMemoText]=useState(''),[users,setUsers]=useState([]);
+  const [fwd,setFwd]=useState(null),[fwdNum,setFwdNum]=useState(''),[fwdName,setFwdName]=useState(''),[fwdBusy,setFwdBusy]=useState(false);
+  const load=()=>api('/api/receive/inbox').then(setList).catch(()=>setList([]));
+  useEffect(()=>{load();if(user.role==='admin'||user.role==='manager')api('/api/users').then(setUsers).catch(()=>{});},[]);
+  const saveMemo=async id=>{try{await api('/api/receive/'+id+'/memo',{method:'POST',body:J({memo:memoText})});toast('메모 저장됨','ok');setMemoId(null);load();}catch(e){toast(e.message,'err');}};
+  const assign=async(id,uid)=>{if(!uid)return;try{await api('/api/receive/'+id+'/assign?target_user_id='+uid,{method:'POST'});toast('배정 완료','ok');load();}catch(e){toast(e.message,'err');}};
+  const doForward=async()=>{if(!fwdNum.trim())return toast('전달할 번호를 입력하세요','err');setFwdBusy(true);
+    try{const r=await api('/api/receive/'+fwd.id+'/forward',{method:'POST',body:J({to_number:fwdNum,to_name:fwdName})});
+      toast(r.message||'전달 요청됨','ok');setFwd(null);setFwdNum('');setFwdName('');}catch(e){toast(e.message,'err');}finally{setFwdBusy(false);}};
+  const canAssign=user.role==='admin'||user.role==='manager';
+  if(!list)return <Loading/>;
+  return <div className="card">
+    <div className="card-h"><div className="card-t">받은 팩스 {list.length>0&&<span className="muted">· {list.length}건</span>}</div>
+      <div className="btn-row"><a className="btn btn-s" href={API+'/api/data/export/received'} download>{I.download}엑셀</a><button className="btn btn-s" onClick={load}>{I.refresh}새로고침</button></div></div>
+    {list.length?<table className="tbl"><thead><tr><th style={{width:8}}></th><th>수신시각</th><th>발신번호</th><th>수신번호</th><th className="num">쪽</th><th>메모</th>{canAssign&&<th>배정</th>}<th></th></tr></thead>
+    <tbody>{list.map(r=><tr key={r.id}>
+      <td>{!r.is_read&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)',display:'inline-block'}}/>}</td>
+      <td className="mono dim">{fmt(r.received_at)}</td><td className="mono">{r.from_number||'-'}</td><td className="mono">{r.to_number||'-'}</td><td className="num mono">{r.pages||0}</td>
+      <td>{memoId===r.id?<span className="inline-edit"><input value={memoText} onChange={e=>setMemoText(e.target.value)} autoFocus onKeyDown={e=>e.key==='Enter'&&saveMemo(r.id)}/><button className="btn btn-x btn-a" onClick={()=>saveMemo(r.id)}>{I.check}</button></span>
+        :<span className="link" onClick={()=>{setMemoId(r.id);setMemoText(r.memo||'');}}>{r.memo||'메모 추가'}</span>}</td>
+      {canAssign&&<td><select defaultValue="" onChange={e=>assign(r.id,e.target.value)} style={{padding:'4px 8px',border:'1px solid var(--border-strong)',borderRadius:5,fontSize:12}}><option value="">{r.user_id?'재배정':'배정'}</option>{users.map(u=><option key={u.id} value={u.id}>{u.display_name}</option>)}</select></td>}
+      <td><div className="btn-row" style={{justifyContent:'flex-end'}}>
+        <button className="btn btn-x" onClick={()=>setPv({url:API+'/api/preview/received/'+r.id,title:'수신 #'+r.id})}>{I.eye}보기</button>
+        <button className="btn btn-x" onClick={()=>{setFwd(r);setFwdNum('');setFwdName('');}}>전달</button></div></td>
+    </tr>)}</tbody></table>:<Empty icon={I.inbox} t="받은 팩스가 없습니다" d="수신된 팩스가 여기에 표시됩니다"/>}
+    {pv&&<PreviewModal {...pv} onClose={()=>{setPv(null);load();}}/>}
+    {fwd&&<div className="scrim" onClick={()=>setFwd(null)}><div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
+      <div className="modal-h"><div className="card-t">팩스 전달</div><button className="btn btn-x" onClick={()=>setFwd(null)}>{I.x}</button></div>
+      <div className="modal-b">
+        <div className="dim" style={{fontSize:13,marginBottom:14}}>수신 #{fwd.id} ({fwd.from_number||'?'}) 팩스를 다른 번호로 전달합니다.</div>
+        <div className="frm"><label>전달할 번호</label><input className="inp" value={fwdNum} onChange={e=>setFwdNum(e.target.value)} placeholder="02-1234-5678" autoFocus/></div>
+        <div className="frm"><label>받는 사람 <span className="dim">(선택)</span></label><input className="inp" value={fwdName} onChange={e=>setFwdName(e.target.value)} placeholder="○○상사 김부장"/></div>
+        <button className="btn btn-a" onClick={doForward} disabled={fwdBusy} style={{width:'100%',justifyContent:'center',padding:11}}>{fwdBusy?'전달 중…':'전달하기'}</button>
+      </div></div></div>}
+  </div>;
+}
+function Contacts({toast}){
+  const [tab,setTab]=useState('list'),[list,setList]=useState(null),[form,setForm]=useState({name:'',fax_number:'',company:''});
+  const [groups,setGroups]=useState([]),[gname,setGname]=useState(''),[gsel,setGsel]=useState(null),[gmem,setGmem]=useState([]);
+  const load=()=>api('/api/contacts').then(setList).catch(()=>setList([]));
+  const loadG=()=>api('/api/contacts/groups').then(setGroups).catch(()=>{});
+  useEffect(()=>{load();loadG();},[]);
+  const add=async()=>{if(!form.name||!form.fax_number)return toast('이름과 번호는 필수입니다','err');try{await api('/api/contacts',{method:'POST',body:J(form)});toast('연락처 추가됨','ok');setForm({name:'',fax_number:'',company:''});load();}catch(e){toast(e.message,'err');}};
+  const del=async id=>{try{await api('/api/contacts/'+id,{method:'DELETE'});load();}catch(e){toast(e.message,'err');}};
+  const addG=async()=>{if(!gname)return toast('그룹명을 입력하세요','err');try{await api('/api/contacts/groups',{method:'POST',body:J({name:gname})});toast('그룹 생성됨','ok');setGname('');loadG();}catch(e){toast(e.message,'err');}};
+  const openG=async g=>{setGsel(g);const ms=await api('/api/contacts/groups/'+g.id+'/members').catch(()=>[]);setGmem(ms.map(m=>m.id));};
+  const saveG=async()=>{try{await api('/api/contacts/groups/'+gsel.id+'/members',{method:'POST',body:J({contact_ids:gmem})});toast('멤버 저장됨','ok');loadG();}catch(e){toast(e.message,'err');}};
+  const delG=async id=>{if(!confirm('그룹을 삭제할까요?'))return;try{await api('/api/contacts/groups/'+id,{method:'DELETE'});setGsel(null);loadG();}catch(e){toast(e.message,'err');}};
+  const [importOpen,setImportOpen]=useState(false);
+  if(!list)return <Loading/>;
+  return <div>
+    <div className="seg" style={{marginBottom:18}}><button className={tab==='list'?'on':''} onClick={()=>setTab('list')}>연락처</button><button className={tab==='group'?'on':''} onClick={()=>setTab('group')}>그룹</button></div>
+    {tab==='list'?<div className="grid-2">
+      <div className="card"><div className="card-h"><div className="card-t">연락처 <span className="muted">· {list.length}</span></div>
+        <div className="btn-row"><button className="btn btn-s" onClick={()=>setImportOpen(true)}>{I.upload}CSV 가져오기</button></div></div>
+        {list.length?<table className="tbl"><thead><tr><th>이름</th><th>번호</th><th>회사</th><th></th></tr></thead>
+        <tbody>{list.map(c=><tr key={c.id}><td style={{fontWeight:600}}>{c.name}</td><td className="mono">{c.fax_number}</td><td className="dim">{c.company||'-'}</td>
+          <td><button className="btn btn-x btn-ghost" onClick={()=>del(c.id)}>{I.trash}</button></td></tr>)}</tbody></table>
+        :<Empty icon={I.book} t="연락처가 없습니다" d="자주 보내는 번호를 등록하세요"/>}</div>
+      <div className="card"><div className="card-h"><div className="card-t">연락처 추가</div></div><div className="card-b">
+        <div className="frm"><label>이름</label><input className="inp" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
+        <div className="frm"><label>팩스번호</label><input className="inp" value={form.fax_number} onChange={e=>setForm({...form,fax_number:e.target.value})}/></div>
+        <div className="frm"><label>회사 <span className="dim">(선택)</span></label><input className="inp" value={form.company} onChange={e=>setForm({...form,company:e.target.value})}/></div>
+        <button className="btn btn-a" onClick={add} style={{width:'100%',justifyContent:'center'}}>{I.plus}추가</button></div></div>
+    </div>:<div className="grid-side">
+      <div className="card"><div className="card-h"><div className="card-t">그룹</div></div>
+        <div className="card-b" style={{borderBottom:'1px solid var(--border)',display:'flex',gap:8}}>
+          <input className="inp" value={gname} onChange={e=>setGname(e.target.value)} placeholder="새 그룹" onKeyDown={e=>e.key==='Enter'&&addG()}/>
+          <button className="btn btn-a" onClick={addG}>{I.plus}</button></div>
+        {groups.length?<div style={{padding:8}}>{groups.map(g=><div key={g.id} className={'nav-a'+(gsel&&gsel.id===g.id?' on':'')} onClick={()=>openG(g)}><span className="lbl">{g.name}</span><span className="cnt">{g.member_count}</span></div>)}</div>
+        :<Empty icon={I.users} t="그룹 없음"/>}</div>
+      <div className="card"><div className="card-h"><div className="card-t">{gsel?gsel.name+' 멤버':'그룹 선택'}</div>
+        {gsel&&<div className="btn-row"><button className="btn btn-s btn-a" onClick={saveG}>{I.check}저장</button><button className="btn btn-s btn-err" onClick={()=>delG(gsel.id)}>삭제</button></div>}</div>
+        {gsel?<div className="card-b">{list.length?list.map(c=><label key={c.id} className="check" style={{padding:'9px 4px',borderBottom:'1px solid var(--border)'}}>
+          <input type="checkbox" checked={gmem.includes(c.id)} onChange={()=>setGmem(m=>m.includes(c.id)?m.filter(x=>x!==c.id):[...m,c.id])}/>
+          <span style={{fontWeight:600,color:'var(--text)'}}>{c.name}</span><span className="mono dim">{c.fax_number}</span></label>):<div className="dim">연락처를 먼저 추가하세요</div>}
+        </div>:<Empty icon={I.book} t="그룹을 선택하세요" d="멤버를 지정하면 동보전송에서 사용합니다"/>}</div>
+    </div>}
+    {importOpen&&<ImportModal toast={toast} onClose={()=>setImportOpen(false)} onDone={()=>{setImportOpen(false);load();}}/>}
+  </div>;
+}
+
+/* ---------- CSV 가져오기 모달 ---------- */
+function ImportModal({toast,onClose,onDone}){
+  const [file,setFile]=useState(null),[preview,setPreview]=useState(null),[busy,setBusy]=useState(false),[shared,setShared]=useState(false);
+  const pick=async f=>{
+    setFile(f);setPreview(null);
+    if(!f)return;
+    const fd=new FormData();fd.append('file',f);
+    try{const r=await api('/api/data/contacts/import/preview',{method:'POST',body:fd});setPreview(r);}
+    catch(e){toast(e.message,'err');setFile(null);}
+  };
+  const doImport=async()=>{
+    if(!file)return;setBusy(true);
+    const fd=new FormData();fd.append('file',file);
+    try{const r=await api('/api/data/contacts/import?is_shared='+shared,{method:'POST',body:fd});toast(r.message,'ok');onDone();}
+    catch(e){toast(e.message,'err');}finally{setBusy(false);}
+  };
+  return <div className="scrim" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560}}>
+    <div className="modal-h"><div className="t">연락처 CSV 가져오기</div><button className="btn btn-x btn-ghost" onClick={onClose}>{I.x}</button></div>
+    <div className="modal-b" style={{background:'var(--surface)'}}>
+      <div style={{marginBottom:14,fontSize:12.5,color:'var(--text-2)'}}>이름·팩스번호·회사 컬럼이 있는 CSV 파일을 올리면 자동 인식합니다. <a className="link" href={API+'/api/data/contacts/template'}>템플릿 받기</a></div>
+      <label className={'drop'+(file?' has':'')} style={{marginBottom:16}}>{file?I.file:I.upload}<span>{file?file.name:'CSV 파일 선택'}</span>
+        <input type="file" accept=".csv,text/csv" style={{display:'none'}} onChange={e=>pick(e.target.files[0])}/></label>
+      {preview&&<div className="card" style={{marginBottom:16,boxShadow:'none'}}>
+        <div className="card-h" style={{padding:'10px 14px'}}><div className="card-t" style={{fontSize:13}}>미리보기 <span className="muted">· 총 {preview.total_rows}건</span></div></div>
+        <table className="tbl"><thead><tr><th>이름</th><th>번호</th><th>회사</th></tr></thead>
+        <tbody>{preview.preview.map((r,i)=><tr key={i}><td>{r.name||<span className="dim">-</span>}</td><td className="mono">{r.fax_number||<span className="dim">-</span>}</td><td className="dim">{r.company||'-'}</td></tr>)}</tbody></table>
+        {(preview.detected.name===null||preview.detected.fax===null)&&<div style={{padding:'10px 14px',fontSize:12,color:'var(--wait)'}}>이름 또는 번호 컬럼을 자동 인식하지 못했습니다. 첫 두 컬럼을 이름·번호로 처리합니다.</div>}
+      </div>}
+      <label className="check" style={{marginBottom:16}}><input type="checkbox" checked={shared} onChange={e=>setShared(e.target.checked)}/>공유 주소록으로 등록 (모든 사용자에게 보임)</label>
+      <button className="btn btn-a" onClick={doImport} disabled={!file||busy} style={{width:'100%',justifyContent:'center'}}>{busy?'가져오는 중…':preview?`${preview.total_rows}건 가져오기`:'가져오기'}</button>
+    </div></div></div>;
+}
+function Stats(){
+  const [dept,setDept]=useState(null),[usr,setUsr]=useState(null);
+  useEffect(()=>{api('/api/stats/by-department').then(setDept).catch(()=>setDept([]));api('/api/stats/by-user').then(setUsr).catch(()=>setUsr([]));},[]);
+  return <div>
+    <div className="card"><div className="card-h"><div className="card-t">부서별 송수신</div>
+      <a className="btn btn-s" href={API+'/api/data/export/stats'} download>{I.download}부서별 엑셀</a>
+      <a className="btn btn-s" href={API+'/api/data/export/client-report?days=30'} download>{I.download}고객사별 실적</a></div>
+      {dept===null?<Loading/>:dept.length?<table className="tbl"><thead><tr><th>부서</th><th className="num">발송</th><th className="num">성공</th><th className="num">수신</th></tr></thead>
+      <tbody>{dept.map(d=><tr key={d.id}><td style={{fontWeight:600}}>{d.name}</td><td className="num mono">{d.sent_count}</td><td className="num mono" style={{color:'var(--ok)'}}>{d.sent_ok}</td><td className="num mono">{d.recv_count}</td></tr>)}</tbody></table>
+      :<Empty icon={I.building} t="부서 데이터 없음" d="부서를 만들고 팩스를 주고받으면 집계됩니다"/>}</div>
+    <div className="card"><div className="card-h"><div className="card-t">사용자별 발송</div></div>
+      {usr===null?<Loading/>:usr.length?<table className="tbl"><thead><tr><th>이름</th><th>아이디</th><th className="num">발송</th><th className="num">성공</th></tr></thead>
+      <tbody>{usr.map(u=><tr key={u.id}><td style={{fontWeight:600}}>{u.display_name}</td><td className="mono dim">{u.username}</td><td className="num mono">{u.sent_count}</td><td className="num mono" style={{color:'var(--ok)'}}>{u.sent_ok}</td></tr>)}</tbody></table>
+      :<Empty icon={I.users} t="사용자 데이터 없음"/>}</div>
+  </div>;
+}
+function UserAdmin({toast}){
+  const [users,setUsers]=useState(null),[depts,setDepts]=useState([]),[show,setShow]=useState(false);
+  const [f,setF]=useState({username:'',password:'',display_name:'',role:'user',dept_id:'',fax_number:''});
+  const load=()=>{api('/api/users').then(setUsers).catch(()=>setUsers([]));api('/api/departments').then(setDepts).catch(()=>{});};
+  useEffect(()=>{load();},[]);
+  const add=async()=>{if(!f.username||!f.password||!f.display_name)return toast('아이디·비밀번호·이름은 필수입니다','err');try{const b={...f};if(!b.dept_id)delete b.dept_id;else b.dept_id=+b.dept_id;await api('/api/users',{method:'POST',body:J(b)});toast('사용자 추가됨','ok');setF({username:'',password:'',display_name:'',role:'user',dept_id:'',fax_number:''});setShow(false);load();}catch(e){toast(e.message,'err');}};
+  const del=async id=>{if(!confirm('삭제할까요?'))return;try{await api('/api/users/'+id,{method:'DELETE'});load();}catch(e){toast(e.message,'err');}};
+  const RN={admin:'관리자',manager:'매니저',user:'사용자'};
+  if(!users)return <Loading/>;
+  return <div className="card">
+    <div className="card-h"><div className="card-t">사용자 <span className="muted">· {users.length}</span></div>
+      <button className="btn btn-s btn-a" onClick={()=>setShow(!show)}>{show?'닫기':<>{I.plus}사용자 추가</>}</button></div>
+    {show&&<div className="card-b" style={{background:'var(--surface-2)',borderBottom:'1px solid var(--border)'}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+        <div className="frm"><label>아이디</label><input className="inp" value={f.username} onChange={e=>setF({...f,username:e.target.value})}/></div>
+        <div className="frm"><label>비밀번호</label><input className="inp" type="password" value={f.password} onChange={e=>setF({...f,password:e.target.value})}/></div>
+        <div className="frm"><label>이름</label><input className="inp" value={f.display_name} onChange={e=>setF({...f,display_name:e.target.value})}/></div>
+        <div className="frm"><label>권한</label><select value={f.role} onChange={e=>setF({...f,role:e.target.value})}><option value="user">사용자</option><option value="manager">매니저</option><option value="admin">관리자</option></select></div>
+        <div className="frm"><label>부서</label><select value={f.dept_id} onChange={e=>setF({...f,dept_id:e.target.value})}><option value="">-</option>{depts.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+        <div className="frm"><label>팩스번호</label><input className="inp" value={f.fax_number} onChange={e=>setF({...f,fax_number:e.target.value})}/></div>
+      </div><button className="btn btn-a" onClick={add}>{I.check}추가</button></div>}
+    <table className="tbl"><thead><tr><th>아이디</th><th>이름</th><th>권한</th><th>부서</th><th>팩스번호</th><th></th></tr></thead>
+    <tbody>{users.map(u=><tr key={u.id}><td className="mono">{u.username}</td><td style={{fontWeight:600}}>{u.display_name}</td>
+      <td><span className={'role role-'+u.role}>{RN[u.role]||u.role}</span></td><td className="dim">{u.dept_name||'-'}</td><td className="mono">{u.fax_number||'-'}</td>
+      <td><button className="btn btn-x btn-ghost" onClick={()=>del(u.id)}>{I.trash}</button></td></tr>)}</tbody></table>
+  </div>;
+}
+function DeptAdmin({toast}){
+  const [depts,setDepts]=useState(null),[f,setF]=useState({name:'',fax_number:''});
+  const load=()=>api('/api/departments').then(setDepts).catch(()=>setDepts([]));
+  useEffect(()=>{load();},[]);
+  const add=async()=>{if(!f.name)return toast('부서명을 입력하세요','err');try{await api('/api/departments',{method:'POST',body:J(f)});toast('부서 추가됨','ok');setF({name:'',fax_number:''});load();}catch(e){toast(e.message,'err');}};
+  const del=async id=>{if(!confirm('삭제할까요?'))return;try{await api('/api/departments/'+id,{method:'DELETE'});load();}catch(e){toast(e.message,'err');}};
+  if(!depts)return <Loading/>;
+  return <div className="grid-2">
+    <div className="card"><div className="card-h"><div className="card-t">부서 <span className="muted">· {depts.length}</span></div></div>
+      {depts.length?<table className="tbl"><thead><tr><th>부서명</th><th>대표 팩스</th><th className="num">인원</th><th></th></tr></thead>
+      <tbody>{depts.map(d=><tr key={d.id}><td style={{fontWeight:600}}>{d.name}</td><td className="mono">{d.fax_number||'-'}</td><td className="num mono">{d.user_count}</td>
+        <td><button className="btn btn-x btn-ghost" onClick={()=>del(d.id)}>{I.trash}</button></td></tr>)}</tbody></table>
+      :<Empty icon={I.building} t="부서가 없습니다"/>}</div>
+    <div className="card"><div className="card-h"><div className="card-t">부서 추가</div></div><div className="card-b">
+      <div className="frm"><label>부서명</label><input className="inp" value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></div>
+      <div className="frm"><label>대표 팩스번호</label><input className="inp" value={f.fax_number} onChange={e=>setF({...f,fax_number:e.target.value})}/></div>
+      <button className="btn btn-a" onClick={add} style={{width:'100%',justifyContent:'center'}}>{I.plus}추가</button></div></div>
+  </div>;
+}
+function PreviewModal({url,title,onClose}){
+  const [page,setPage]=useState(0),[err,setErr]=useState(false),[loading,setLoading]=useState(true);
+  const src=url+(url.includes('?')?'&':'?')+'page='+page;
+  return <div className="scrim" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
+    <div className="modal-h"><div className="t">{title||'미리보기'}</div>
+      <div className="btn-row" style={{alignItems:'center'}}>
+        <button className="btn btn-x" onClick={()=>{setLoading(true);setPage(Math.max(0,page-1));}} disabled={page===0}>{I.chevL}</button>
+        <span className="mono dim" style={{fontSize:12.5,minWidth:28,textAlign:'center'}}>{page+1}쪽</span>
+        <button className="btn btn-x" onClick={()=>{setLoading(true);setPage(page+1);}}>{I.chevR}</button>
+        <button className="btn btn-x btn-ghost" onClick={onClose}>{I.x}</button></div></div>
+    <div className="modal-b">
+      {err?<Empty icon={I.file} t="미리보기를 불러올 수 없습니다" d="파일이 없거나 변환에 실패했습니다"/>
+      :<><img src={src} className="pv-img" onLoad={()=>{setLoading(false);setErr(false);}} onError={()=>{setLoading(false);if(page===0)setErr(true);else setPage(page-1);}}/>
+      {loading&&<div className="center-load"><span className="spinner"/></div>}</>}
+    </div></div></div>;
+}
+
+/* ---------- 오류 로그 (관리자) ---------- */
+const ECAT={user:['b-wait','사용자'],retryable:['b-wait','일시적'],permanent:['b-err','영구'],system:['b-err','시스템'],auth:['b-dim','인증']};
+function Diagnostics({toast}){
+  const [health,setHealth]=useState(null),[fault,setFault]=useState(null),[busy,setBusy]=useState(false);
+  const [trend,setTrend]=useState(null);
+  const [line,setLine]=useState(null),[lineBusy,setLineBusy]=useState(false);
+  const load=async()=>{setBusy(true);try{
+    const [h,f,tr]=await Promise.all([api('/api/diag/health'),api('/api/diag/fault-analysis?days=7'),api('/api/diag/fault-trend?days=14')]);
+    setHealth(h);setFault(f);setTrend(tr);
+  }catch(e){toast(e.message,'err');}finally{setBusy(false);}};
+  const loadLine=async()=>{setLineBusy(true);try{const l=await api('/api/diag/line');setLine(l);}catch(e){toast(e.message,'err');}finally{setLineBusy(false);}};
+  useEffect(()=>{load();},[]);
+  const FKR={local:['우리 서버','#e0483d'],remote:['상대방','#e08c1a'],link:['회선','#7c5cbf'],user:['사용자 입력','#2563eb'],unknown:['미상','#8c96ab']};
+  const ledColor=(l)=>l.ok===true?'#0f9d58':l.ok===false?'#e0483d':'#e08c1a';
+  return <div>
+    <div className="card" style={{marginBottom:16}}>
+      <div className="card-h"><div className="card-t">시스템 상태 · 계층별 진단</div>
+        <button className="btn" onClick={load} disabled={busy}>{busy?'점검 중…':'다시 점검'}</button></div>
+      <div className="card-b">
+        <div className="dim" style={{marginBottom:14,fontSize:13}}>발송 경로를 앱 → DB → 팩스서버 → 게이트웨이 순으로 점검합니다. 문제 지점이 바로 표시됩니다.</div>
+        {health&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10}}>
+          {health.layers.map(l=><div key={l.key} style={{display:'flex',alignItems:'center',gap:11,padding:'13px 15px',background:'var(--surface-2)',borderRadius:'var(--r-sm)',border:health.first_fail===l.key?'1px solid #e0483d':'1px solid transparent'}}>
+            <span style={{width:10,height:10,borderRadius:'50%',background:ledColor(l),flexShrink:0}}></span>
+            <div style={{minWidth:0,flex:1}}><div style={{fontWeight:600,fontSize:13}}>{l.layer}</div>
+              <div className="dim" style={{fontSize:12}}>{l.detail}{l.ms>0?' · '+l.ms+'ms':''}</div></div>
+          </div>)}
+        </div>}
+        {health&&<div style={{marginTop:14,padding:'11px 15px',borderRadius:'var(--r-sm)',fontSize:13,fontWeight:600,
+          background:health.overall==='ok'?'#e7f6ee':'#fdecea',color:health.overall==='ok'?'#0f9d58':'#e0483d'}}>
+          {health.overall==='ok'?'✓ ':'⚠ '}{health.summary}</div>}
+      </div>
+    </div>
+
+    <div className="card">
+      <div className="card-h"><div className="card-t">문제 위치 분석 · 최근 7일</div></div>
+      <div className="card-b">
+        <div className="dim" style={{marginBottom:14,fontSize:13}}>발송 실패가 <b>우리 서버</b> 문제인지 <b>상대방</b> 문제인지 <b>회선</b> 문제인지 분류합니다.</div>
+        {fault&&fault.total_failures===0&&<div className="dim" style={{padding:'20px 0',textAlign:'center'}}>최근 7일간 실패가 없습니다. 👍</div>}
+        {fault&&fault.total_failures>0&&<>
+          <div style={{marginBottom:16}}>
+            {fault.by_fault.map(b=><div key={b.fault} style={{marginBottom:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
+                <span style={{fontWeight:600}}>{(FKR[b.fault]||['',''])[0]||b.label}</span>
+                <span className="dim">{b.count}건 · {b.pct}%</span></div>
+              <div style={{height:8,background:'var(--surface-2)',borderRadius:4,overflow:'hidden'}}>
+                <div style={{width:b.pct+'%',height:'100%',background:(FKR[b.fault]||['','#888'])[1]}}></div></div>
+            </div>)}
+          </div>
+          <div style={{padding:'11px 15px',borderRadius:'var(--r-sm)',background:'var(--surface-2)',fontSize:13,fontWeight:600}}>
+            {fault.dominant==='local'?'⚠ ':fault.dominant==='remote'?'📞 ':'🔌 '}{fault.summary}</div>
+          <div style={{marginTop:16}}>
+            <div style={{fontSize:12,fontWeight:600,color:'var(--text-2)',marginBottom:8}}>오류 코드별 상세</div>
+            {fault.by_code.map(c=><div key={c.code} style={{display:'flex',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid var(--line)',fontSize:12.5}}>
+              <span className="mono">{c.code}</span>
+              <span><span style={{color:(FKR[c.fault]||['','#888'])[1],fontWeight:600}}>{(FKR[c.fault]||['',''])[0]}</span> <span className="dim">· {c.count}건</span></span>
+            </div>)}
+          </div>
+        </>}
+      </div>
+    </div>
+
+    <div className="card" style={{marginTop:16}}>
+      <div className="card-h"><div className="card-t">일별 실패 추이 <span className="dim" style={{fontWeight:400,fontSize:12}}>· 최근 14일</span></div></div>
+      <div className="card-b">
+        {!trend?<Loading/>:trend.total_failures===0?
+          <div className="dim" style={{padding:'20px 0',textAlign:'center'}}>최근 14일간 실패가 없습니다. 👍</div>
+        :<>
+          <div className="dim" style={{marginBottom:14,fontSize:13}}>날짜별 실패를 <b>우리 서버</b>·<b>상대방</b>·<b>회선</b>·<b>사용자</b>로 나눠 쌓은 그래프입니다.</div>
+          {(()=>{const FC={local:'#e0483d',remote:'#e08c1a',link:'#7c5cbf',user:'#2563eb',unknown:'#8c96ab'};
+            const mx=Math.max(1,...trend.trend.map(d=>d.total));
+            return <>
+            <div style={{display:'flex',alignItems:'flex-end',gap:3,height:120,padding:'0 2px'}}>
+              {trend.trend.map(d=><div key={d.day} style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'flex-end',alignItems:'center',height:'100%'}} title={d.day+' · 총 '+d.total+'건'}>
+                <div style={{width:'100%',display:'flex',flexDirection:'column-reverse',height:(d.total/mx*100)+'%',minHeight:d.total?4:0,borderRadius:'2px 2px 0 0',overflow:'hidden'}}>
+                  {['local','remote','link','user','unknown'].map(f=>d[f]>0&&<div key={f} style={{height:(d[f]/d.total*100)+'%',background:FC[f]}}></div>)}
+                </div>
+              </div>)}
+            </div>
+            <div style={{display:'flex',gap:3,marginTop:4}}>
+              {trend.trend.map(d=><div key={d.day} className="dim" style={{flex:1,textAlign:'center',fontSize:9,whiteSpace:'nowrap',overflow:'hidden'}}>{d.day.slice(5)}</div>)}
+            </div>
+            <div style={{display:'flex',gap:14,marginTop:14,flexWrap:'wrap',justifyContent:'center'}}>
+              {Object.entries({local:'우리 서버',remote:'상대방',link:'회선',user:'사용자',unknown:'미상'}).map(([f,lb])=>trend.totals[f]>0&&
+                <span key={f} style={{display:'flex',alignItems:'center',gap:5,fontSize:12}}>
+                  <span style={{width:10,height:10,borderRadius:2,background:FC[f]}}></span>
+                  <span className="dim">{lb} {trend.totals[f]}건</span></span>)}
+            </div>
+            </>;})()}
+        </>}
+      </div>
+    </div>
+
+    <div className="card" style={{marginTop:16}}>
+      <div className="card-h"><div className="card-t">회선 · 게이트웨이 진단 <span className="dim" style={{fontWeight:400,fontSize:12}}>· 하드웨어 연결 점검</span></div>
+        <button className="btn" onClick={loadLine} disabled={lineBusy}>{lineBusy?'점검 중…':'회선 점검'}</button></div>
+      <div className="card-b">
+        <div className="dim" style={{marginBottom:14,fontSize:13}}>E1 링크 → 게이트웨이 등록 → T.38 엔진을 순서대로 점검합니다. 게이트웨이·보드 연결 후 확인하세요.</div>
+        {!line?<div className="dim" style={{padding:'8px 0',fontSize:13}}>"회선 점검" 버튼을 눌러 팩스 회선 상태를 확인하세요.</div>:<>
+          <div style={{display:'grid',gap:8,marginBottom:12}}>
+            {line.checks.map(c=><div key={c.key} style={{display:'flex',alignItems:'center',gap:11,padding:'11px 14px',background:'var(--surface-2)',borderRadius:'var(--r-sm)',border:!c.ok?'1px solid #e0483d':'1px solid transparent'}}>
+              <span style={{width:9,height:9,borderRadius:'50%',flexShrink:0,background:c.ok?'#0f9d58':'#e0483d'}}></span>
+              <div style={{flex:1,minWidth:0}}><div style={{fontWeight:600,fontSize:13}}>{c.label}</div>
+                <div className="dim" style={{fontSize:12}}>{c.detail}{c.hint?' · '+c.hint:''}</div></div>
+            </div>)}
+          </div>
+          <div style={{padding:'11px 15px',borderRadius:'var(--r-sm)',fontSize:13,fontWeight:600,
+            background:line.overall==='ok'?'#e7f6ee':'#fdecea',color:line.overall==='ok'?'#0f9d58':'#e0483d'}}>
+            {line.overall==='ok'?'✓ ':'⚠ '}{line.summary}</div>
+        </>}
+      </div>
+    </div>
+  </div>;
+}
+
+function MailMerge({toast}){
+  const [csvText,setCsvText]=useState(''),[file,setFile]=useState(null),[coverTpl,setCoverTpl]=useState('standard');
+  const [tpls,setTpls]=useState([]),[busy,setBusy]=useState(false),[result,setResult]=useState(null);
+  useEffect(()=>{api('/api/fax/cover-templates').then(setTpls).catch(()=>{});},[]);
+  const parsed=(()=>{try{const lines=csvText.trim().split('\n').filter(l=>l.trim());if(lines.length<2)return[];const h=lines[0].toLowerCase();const hasNum=h.includes('number')||h.includes('번호');return hasNum?lines.slice(1):[];}catch{return[];}})();
+  const send=async()=>{
+    if(!file)return toast('공통 본문 문서를 선택하세요','err');
+    if(parsed.length===0)return toast('CSV에 수신자를 입력하세요 (헤더+최소 1행)','err');
+    setBusy(true);setResult(null);
+    try{const fd=new FormData();fd.append('file',file);fd.append('csv_data',csvText);fd.append('cover_template',coverTpl);
+      const r=await api('/api/fax/mailmerge',{method:'POST',body:fd});
+      setResult(r);toast('대량 발송 요청 완료 · '+r.queued+'/'+r.total+'건','ok');
+    }catch(e){toast(e.message,'err');}finally{setBusy(false);}
+  };
+  return <div className="card" style={{maxWidth:680}}>
+    <div className="card-h"><div className="card-t">대량 맞춤 발송 <span className="dim" style={{fontWeight:400,fontSize:12}}>· 수신자별 개별 표지</span></div></div>
+    <div className="card-b">
+      <div className="dim" style={{fontSize:13,marginBottom:16}}>공통 본문 하나에, 수신자별로 다른 표지(이름·제목·메모)를 붙여 한 번에 보냅니다. CSV로 수신자 목록을 입력하세요.</div>
+      <div className="frm"><label>수신자 목록 (CSV)</label>
+        <textarea value={csvText} onChange={e=>setCsvText(e.target.value)} rows={7} style={{fontFamily:'monospace',fontSize:13}}
+          placeholder={'number,name,title,memo\n02-1234-5678,대성물산 김부장,계약서 송부,검토 부탁드립니다\n031-777-8888,한빛기업,견적 안내,'}/>
+        <div className="dim" style={{fontSize:12,marginTop:6}}>첫 줄은 헤더: number(필수),name,title,memo · 한글 헤더(번호,이름,제목,메모)도 가능
+          {parsed.length>0&&<span style={{color:'var(--accent,#2563eb)',fontWeight:600}}> · 수신자 {parsed.length}명 인식됨</span>}</div></div>
+      <div className="frm"><label>공통 본문 문서</label>
+        <label className={'drop'+(file?' has':'')}>{file?I.file:I.clip}<span>{file?file.name:'모든 수신자에게 공통으로 나갈 문서'}</span>
+          <input type="file" style={{display:'none'}} onChange={e=>setFile(e.target.files[0])}/></label></div>
+      {tpls.length>0&&<div className="frm"><label>표지 스타일</label>
+        <div className="seg" style={{width:'100%'}}>{tpls.map(t=><button key={t.id} type="button" className={coverTpl===t.id?'on':''} onClick={()=>setCoverTpl(t.id)} style={{flex:1}}>{t.name}</button>)}</div></div>}
+      <button className="btn btn-a" onClick={send} disabled={busy} style={{width:'100%',justifyContent:'center',padding:12}}>{busy?'발송 중…':(parsed.length>0?parsed.length+'명에게 발송':'대량 발송')}</button>
+      {result&&<div style={{marginTop:16,padding:'12px 15px',borderRadius:'var(--r-sm)',background:'var(--surface-2)'}}>
+        <div style={{fontWeight:600,marginBottom:8}}>발송 결과 · {result.queued}/{result.total}건 요청됨</div>
+        {result.results&&result.results.filter(r=>!r.ok).length>0&&<div style={{fontSize:13,color:'var(--danger,#e0483d)'}}>실패: {result.results.filter(r=>!r.ok).map(r=>r.number).join(', ')}</div>}
+      </div>}
+    </div></div>;
+}
+
+function Scheduled({toast}){
+  const [list,setList]=useState(null);
+  const load=()=>api('/api/fax/scheduled').then(setList).catch(e=>toast(e.message,'err'));
+  useEffect(()=>{load();},[]);
+  const cancel=async(id)=>{if(!confirm('예약을 취소할까요?'))return;
+    try{await api('/api/fax/scheduled/'+id+'/cancel',{method:'POST'});toast('예약 취소됨','ok');load();}catch(e){toast(e.message,'err');}};
+  const fmt=s=>{if(!s)return'-';const d=new Date(s);return d.toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});};
+  return <div className="card">
+    <div className="card-h"><div className="card-t">예약 발송</div><button className="btn" onClick={load}>{I.refresh}새로고침</button></div>
+    <div className="card-b" style={{padding:0}}>
+      {!list?<div className="dim" style={{padding:24,textAlign:'center'}}>불러오는 중…</div>:
+       list.length===0?<div className="dim" style={{padding:24,textAlign:'center'}}>예약된 발송이 없습니다.</div>:
+       <table className="tbl"><thead><tr><th>예약 시각</th><th>받는 번호</th><th>받는 사람</th><th>파일</th><th>매수</th><th></th></tr></thead>
+       <tbody>{list.map(j=><tr key={j.id}>
+         <td style={{fontWeight:600}}>{fmt(j.scheduled_at)}</td><td className="mono">{j.to_number}</td>
+         <td>{j.to_name||'-'}</td><td className="dim">{j.file_name}</td><td>{j.pages}p</td>
+         <td><button className="btn btn-x" onClick={()=>cancel(j.id)}>취소</button></td>
+       </tr>)}</tbody></table>}
+    </div>
+  </div>;
+}
+
+function ApiKeys({toast}){
+  const [keys,setKeys]=useState(null),[name,setName]=useState(''),[busy,setBusy]=useState(false),[newKey,setNewKey]=useState(null),[err,setErr]=useState(null);
+  const load=()=>api('/api/v1/keys').then(k=>{setKeys(k);setErr(null);}).catch(e=>{setErr(e.message);setKeys([]);});
+  useEffect(()=>{load();},[]);
+  const create=async()=>{if(!name.trim())return toast('키 용도를 입력하세요','err');setBusy(true);
+    try{const r=await api('/api/v1/keys',{method:'POST',body:J({name:name})});setNewKey(r);setName('');setErr(null);load();}catch(e){toast(e.message,'err');setErr(e.message);}finally{setBusy(false);}};
+  const revoke=async(id)=>{if(!confirm('이 키를 폐기할까요? 해당 키로는 더 이상 발송할 수 없습니다.'))return;
+    try{await api('/api/v1/keys/'+id+'/revoke',{method:'POST'});toast('키 폐기됨','ok');load();}catch(e){toast(e.message,'err');}};
+  const copyKey=(k)=>{navigator.clipboard&&navigator.clipboard.writeText(k);toast('키가 복사되었습니다','ok');};
+  const fmt=s=>s?new Date(s).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-';
+  return <div>
+    {err&&<div className="card" style={{maxWidth:720,marginBottom:16}}><div className="card-b">
+      <div style={{padding:'11px 15px',borderRadius:'var(--r-sm)',background:'#fdecea',color:'#a3271f',fontSize:13,lineHeight:1.6}}>
+        <b>API 연동 기능이 아직 설정되지 않았습니다.</b><br/>데이터베이스 준비가 필요합니다. 서버에서 다음을 실행하세요:<br/>
+        <code style={{display:'block',marginTop:6,padding:'6px 10px',background:'#fff',borderRadius:5,fontSize:12}}>sudo -u postgres psql -d faxapp -f sql/migration_apikey.sql</code></div>
+    </div></div>}
+    <div className="card" style={{maxWidth:720,marginBottom:16}}>
+      <div className="card-h"><div className="card-t">API 키 발급</div></div>
+      <div className="card-b">
+        <div className="dim" style={{fontSize:13,marginBottom:14}}>다른 사내 시스템(ERP·그룹웨어 등)이 이 키로 팩스를 보낼 수 있습니다. 키는 발급 시 한 번만 표시됩니다.</div>
+        <div className="btn-row" style={{alignItems:'flex-end'}}>
+          <div className="frm" style={{flex:1,marginBottom:0}}><label>키 용도</label>
+            <input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="예: ERP 자동 발송" onKeyDown={e=>e.key==='Enter'&&create()}/></div>
+          <button className="btn btn-a" onClick={create} disabled={busy}>{busy?'발급 중…':'키 발급'}</button></div>
+        {newKey&&<div style={{marginTop:16,padding:'14px 16px',borderRadius:'var(--r-sm)',background:'#fef9e7',border:'1px solid #f0d478'}}>
+          <div style={{fontWeight:600,fontSize:13,marginBottom:8,color:'#8a6d00'}}>⚠ 새 키가 발급되었습니다 · 지금만 확인 가능합니다</div>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <code style={{flex:1,padding:'8px 12px',background:'#fff',borderRadius:6,fontSize:13,wordBreak:'break-all',border:'1px solid #e3d9a0'}}>{newKey.key}</code>
+            <button className="btn btn-s" onClick={()=>copyKey(newKey.key)}>복사</button></div>
+          <div className="dim" style={{fontSize:12,marginTop:8}}>이 키를 안전한 곳에 보관하세요. 창을 닫으면 다시 볼 수 없습니다.</div>
+          <button className="btn btn-x" onClick={()=>setNewKey(null)} style={{marginTop:10}}>확인했습니다</button></div>}
+      </div></div>
+    <div className="card" style={{maxWidth:720}}>
+      <div className="card-h"><div className="card-t">발급된 키 {keys&&keys.length>0&&<span className="muted">· {keys.length}개</span>}</div><button className="btn btn-s" onClick={load}>{I.refresh}새로고침</button></div>
+      <div className="card-b" style={{padding:0}}>
+        {!keys?<div className="dim" style={{padding:24,textAlign:'center'}}>불러오는 중…</div>:
+         keys.length===0?<div className="dim" style={{padding:24,textAlign:'center'}}>발급된 키가 없습니다.</div>:
+         <table className="tbl"><thead><tr><th>용도</th><th>키</th><th>사용횟수</th><th>마지막 사용</th><th>상태</th><th></th></tr></thead>
+         <tbody>{keys.map(k=><tr key={k.id} style={{opacity:k.is_active?1:0.5}}>
+           <td style={{fontWeight:600}}>{k.name}</td>
+           <td className="mono dim">{k.key_prefix}…</td>
+           <td className="mono">{k.call_count}</td>
+           <td className="dim">{fmt(k.last_used_at)}</td>
+           <td>{k.is_active?<span style={{color:'var(--ok,#0f9d58)',fontWeight:600,fontSize:12}}>활성</span>:<span className="dim" style={{fontSize:12}}>폐기됨</span>}</td>
+           <td>{k.is_active&&<button className="btn btn-x" onClick={()=>revoke(k.id)}>폐기</button>}</td>
+         </tr>)}</tbody></table>}
+      </div></div>
+  </div>;
+}
+
+function NotifyConfig({toast}){
+  const [cfg,setCfg]=useState(null),[busy,setBusy]=useState(false),[err,setErr]=useState(null);
+  useEffect(()=>{api('/api/notify/config').then(c=>{setCfg(c);setErr(null);}).catch(e=>{setErr(e.message);setCfg({webhook_url:'',notify_on_fail:true,notify_on_recv:false});});},[]);
+  const save=async()=>{setBusy(true);try{await api('/api/notify/config',{method:'POST',body:J(cfg)});toast('알림 설정 저장됨','ok');setErr(null);}catch(e){toast(e.message,'err');setErr(e.message);}finally{setBusy(false);}};
+  const test=async()=>{try{const r=await api('/api/notify/test',{method:'POST'});toast(r.message||'테스트 알림 발송','ok');}catch(e){toast(e.message,'err');}};
+  if(!cfg)return <Loading/>;
+  return <div className="card" style={{maxWidth:640}}>
+    <div className="card-h"><div className="card-t">알림 설정</div></div>
+    <div className="card-b">
+      {err&&<div style={{marginBottom:14,padding:'11px 15px',borderRadius:'var(--r-sm)',background:'#fdecea',color:'#a3271f',fontSize:13,lineHeight:1.6}}>
+        <b>알림 기능이 아직 설정되지 않았습니다.</b><br/>데이터베이스 준비가 필요합니다. 서버에서 다음을 실행하세요:<br/>
+        <code style={{display:'block',marginTop:6,padding:'6px 10px',background:'#fff',borderRadius:5,fontSize:12}}>sudo -u postgres psql -d faxapp -f sql/migration_notify.sql</code></div>}
+      <div className="dim" style={{fontSize:13,marginBottom:16}}>발송 실패나 수신 시 알림을 받습니다. 웹훅을 설정하면 Slack 등 외부로도 전송됩니다.</div>
+      <div className="frm"><label>웹훅 URL <span className="dim">(선택 · Slack Incoming Webhook 등)</span></label>
+        <input className="inp" value={cfg.webhook_url||''} onChange={e=>setCfg({...cfg,webhook_url:e.target.value})} placeholder="https://hooks.slack.com/services/..."/></div>
+      <label className="check" style={{marginBottom:12}}><input type="checkbox" checked={cfg.notify_on_fail} onChange={e=>setCfg({...cfg,notify_on_fail:e.target.checked})}/>발송 실패 시 알림</label>
+      <label className="check" style={{marginBottom:18}}><input type="checkbox" checked={cfg.notify_on_recv} onChange={e=>setCfg({...cfg,notify_on_recv:e.target.checked})}/>팩스 수신 시 알림</label>
+      <div className="btn-row">
+        <button className="btn btn-a" onClick={save} disabled={busy}>{busy?'저장 중…':'저장'}</button>
+        <button className="btn btn-s" onClick={test}>테스트 알림 보내기</button></div>
+    </div></div>;
+}
+
+function ErrorLog({toast}){
+  const [sum,setSum]=useState(null),[list,setList]=useState(null),[cat,setCat]=useState('');
+  const load=()=>{api('/api/errors/summary?days=7').then(setSum).catch(()=>setSum({total:0,unresolved:0,by_category:[],by_code:[]}));
+    api('/api/errors'+(cat?'?category='+cat:'')).then(setList).catch(()=>setList([]));};
+  useEffect(()=>{load();},[cat]);
+  const resolve=async id=>{try{await api('/api/errors/'+id+'/resolve',{method:'POST'});load();}catch(e){toast(e.message,'err');}};
+  const resolveAll=async()=>{if(!confirm('모든 오류를 처리됨으로 표시할까요?'))return;try{await api('/api/errors/resolve-all',{method:'POST'});toast('처리 완료','ok');load();}catch(e){toast(e.message,'err');}};
+  const clearAll=async()=>{if(!confirm('오류/알람 로그를 전체 삭제할까요? (되돌릴 수 없습니다)'))return;try{const r=await api('/api/errors/clear-all?confirm=true',{method:'DELETE'});toast(r.message||'전체 삭제됨','ok');load();}catch(e){toast(e.message,'err');}};
+  if(!sum||!list)return <Loading/>;
+  const CATS=[['','전체'],['user','사용자'],['retryable','일시적'],['permanent','영구'],['system','시스템']];
+  return <div>
+    <div className="stats-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))'}}>
+      <div className="stat"><div className="lbl"><span className="dot err"/>최근 7일 오류</div><div className="num">{sum.total}</div></div>
+      <div className="stat"><div className="lbl"><span className="dot wait"/>미처리</div><div className="num">{sum.unresolved}</div></div>
+      {sum.by_category.slice(0,2).map(c=><div className="stat" key={c.category}><div className="lbl"><span className="dot"/>{(ECAT[c.category]||['','?'])[1]}</div><div className="num">{c.cnt}</div></div>)}
+    </div>
+    {sum.by_code.length>0&&<div className="card"><div className="card-h"><div className="card-t">자주 발생한 오류</div></div>
+      <div className="card-b"><div className="mbars">{sum.by_code.slice(0,8).map(c=>{const mx=sum.by_code[0].cnt||1;const[cc]=ECAT[c.category]||['b-dim'];return <div className="mbar" key={c.code}>
+        <div className="l"><span className={'badge '+cc} style={{fontSize:10.5}}>{c.code}</span></div>
+        <div className="track"><div className="fill" style={{width:(c.cnt/mx*100)+'%',background:c.category==='permanent'||c.category==='system'?'var(--err)':'var(--wait)'}}/></div>
+        <div className="v">{c.cnt}</div></div>;})}</div></div></div>}
+    <div className="card">
+      <div className="card-h"><div className="seg">{CATS.map(([v,l])=><button key={v} className={cat===v?'on':''} onClick={()=>setCat(v)}>{l}</button>)}</div>
+        {sum.unresolved>0&&<button className="btn btn-s" onClick={resolveAll}>{I.check}전체 처리</button>}
+        {sum.total>0&&<button className="btn btn-s" onClick={clearAll} style={{color:'#e0483d'}}>전체 삭제</button>}</div>
+      {list.length?<table className="tbl"><thead><tr><th>시각</th><th>코드</th><th>성격</th><th>내용</th><th>사용자</th><th></th></tr></thead>
+      <tbody>{list.map(e=>{const[cc,cl]=ECAT[e.category]||['b-dim',e.category];return <tr key={e.id} style={{opacity:e.resolved?.5:1}}>
+        <td className="mono dim">{fmt(e.created_at)}</td><td className="mono" style={{fontWeight:600}}>{e.code}</td>
+        <td><span className={'badge '+cc}>{cl}</span></td><td className="dim" style={{maxWidth:320,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={e.detail}>{e.detail}</td>
+        <td className="dim">{e.username||'-'}</td>
+        <td>{!e.resolved&&<button className="btn btn-x" onClick={()=>resolve(e.id)}>처리</button>}</td>
+      </tr>;})}</tbody></table>:<Empty icon={I.check} t="오류 없음" d="최근 기록된 오류가 없습니다"/>}
+    </div>
+  </div>;
+}
+
+const NAV=[
+  {id:'dashboard',ic:'grid',label:'대시보드',sec:'현황'},
+  {id:'diag',ic:'alert',label:'시스템 진단',sec:'현황'},
+  {id:'send',ic:'send',label:'팩스 보내기',sec:'발송'},
+  {id:'history',ic:'list',label:'발송 이력',sec:'발송'},
+  {id:'mailmerge',ic:'users',label:'대량 발송',sec:'발송'},
+  {id:'scheduled',ic:'clock',label:'예약 발송',sec:'발송'},
+  {id:'inbox',ic:'inbox',label:'받은 팩스',sec:'수신'},
+  {id:'contacts',ic:'book',label:'주소록',sec:'관리'},
+  {id:'stats',ic:'chart',label:'통계',sec:'관리',roles:['admin','manager']},
+  {id:'users',ic:'users',label:'사용자',sec:'설정',roles:['admin']},
+  {id:'depts',ic:'building',label:'부서',sec:'설정',roles:['admin']},
+  {id:'errlog',ic:'alert',label:'오류 로그',sec:'설정',roles:['admin']},
+  {id:'notifycfg',ic:'bell',label:'알림 설정',sec:'설정',roles:['admin']},
+  {id:'apikeys',ic:'users',label:'API 연동',sec:'설정',roles:['admin']},
+];
+const TITLES={dashboard:['대시보드','오늘의 팩스 현황'],diag:['시스템 진단','문제 위치 실시간 확인'],send:['팩스 보내기',''],history:['발송 이력','보낸 팩스 관리'],mailmerge:['대량 발송','수신자별 맞춤 발송'],scheduled:['예약 발송','예약된 팩스 관리'],inbox:['받은 팩스',''],contacts:['주소록',''],stats:['통계','부서·사용자별 집계'],users:['사용자 관리',''],depts:['부서 관리',''],errlog:['오류 로그','시스템 예외 추적'],notifycfg:['알림 설정','실패·수신 통보 설정'],apikeys:['API 연동','외부 시스템 팩스 발송 키']};
+function App(){
+  const [user,setUser]=useState(undefined),[page,setPage]=useState('dashboard'),[toastMsg,setToast]=useState(null),[unread,setUnread]=useState(0);
+  const [notifs,setNotifs]=useState([]),[notifOpen,setNotifOpen]=useState(false),[notifUnread,setNotifUnread]=useState(0);
+  const loadNotifs=()=>{if(!user)return;api('/api/notify/list?limit=30').then(setNotifs).catch(()=>{});api('/api/notify/unread-count').then(d=>setNotifUnread(d.unread)).catch(()=>{});};
+  useEffect(()=>{if(user){loadNotifs();const t=setInterval(loadNotifs,30000);return()=>clearInterval(t);}},[user,page]);
+  const readAllNotif=async()=>{await api('/api/notify/read-all',{method:'POST'}).catch(()=>{});loadNotifs();};
+  const readNotif=async(id)=>{await api('/api/notify/'+id+'/read',{method:'POST'}).catch(()=>{});loadNotifs();};
+  const toast=useCallback((m,type)=>{setToast({m,type});setTimeout(()=>setToast(null),2600);},[]);
+  useEffect(()=>{api('/api/auth/me').then(setUser).catch(()=>setUser(null));},[]);
+  useEffect(()=>{if(user)api('/api/receive/unread/count').then(d=>setUnread(d.unread)).catch(()=>{});},[user,page]);
+  if(user===undefined)return <div className="auth"><span className="spinner"/></div>;
+  if(user===null)return <Login onLogin={setUser}/>;
+  const logout=async()=>{await api('/api/auth/logout',{method:'POST'}).catch(()=>{});setUser(null);};
+  const nav=NAV.filter(n=>!n.roles||n.roles.includes(user.role));
+  const secs=[...new Set(nav.map(n=>n.sec))];
+  const ti=TITLES[page]||['',''];
+  const PAGES={dashboard:<Dashboard/>,diag:<Diagnostics toast={toast}/>,send:<Send toast={toast}/>,history:<SendHistory toast={toast}/>,mailmerge:<MailMerge toast={toast}/>,scheduled:<Scheduled toast={toast}/>,inbox:<Inbox toast={toast} user={user}/>,contacts:<Contacts toast={toast}/>,stats:<Stats/>,users:<UserAdmin toast={toast}/>,depts:<DeptAdmin toast={toast}/>,errlog:<ErrorLog toast={toast}/>,notifycfg:<NotifyConfig toast={toast}/>,apikeys:<ApiKeys toast={toast}/>};
+  return <div className="shell">
+    <aside className="side">
+      <div className="side-top"><div className="mark">{I.fax}</div><div className="nm">FaxApp</div></div>
+      <nav className="nav">{secs.map(s=><div key={s}>
+        <div className="nav-sec">{s}</div>
+        {nav.filter(n=>n.sec===s).map(n=><div key={n.id} className={'nav-a'+(page===n.id?' on':'')} onClick={()=>setPage(n.id)}>
+          {I[n.ic]}<span className="lbl">{n.label}</span>{n.id==='inbox'&&unread>0&&<span className="cnt">{unread}</span>}</div>)}
+      </div>)}</nav>
+      <div className="side-user"><div className="avatar">{(user.display_name||user.username||'U')[0]}</div>
+        <div className="who"><div className="n">{user.display_name||user.username}</div><div className="r">{({admin:'관리자',manager:'매니저',user:'사용자'})[user.role]||user.role}</div></div>
+        <button className="icon-btn" onClick={logout} title="로그아웃">{I.power}</button></div>
+    </aside>
+    <main className="main">
+      <header className="head"><div><h2>{ti[0]}</h2>{ti[1]&&<div className="head-sub">{ti[1]}</div>}</div>
+        <div style={{position:'relative'}}>
+          <button className="icon-btn" onClick={()=>{setNotifOpen(o=>!o);if(!notifOpen)loadNotifs();}} title="알림" style={{position:'relative'}}>
+            {I.bell}{notifUnread>0&&<span style={{position:'absolute',top:-2,right:-2,background:'var(--danger,#e0483d)',color:'#fff',fontSize:10,fontWeight:600,minWidth:16,height:16,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px'}}>{notifUnread}</span>}
+          </button>
+          {notifOpen&&<div style={{position:'absolute',right:0,top:42,width:360,maxHeight:440,overflowY:'auto',background:'var(--surface-2,#fff)',border:'1px solid var(--line,#e3e8ef)',borderRadius:12,boxShadow:'0 8px 28px rgba(0,0,0,.14)',zIndex:100}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 16px',borderBottom:'1px solid var(--line,#e3e8ef)'}}>
+              <span style={{fontWeight:600}}>알림</span>
+              {notifUnread>0&&<span className="link" style={{fontSize:12,cursor:'pointer'}} onClick={readAllNotif}>모두 읽음</span>}</div>
+            {notifs.length===0?<div className="dim" style={{padding:'28px 16px',textAlign:'center',fontSize:13}}>알림이 없습니다</div>:
+             notifs.map(n=><div key={n.id} onClick={()=>readNotif(n.id)} style={{padding:'11px 16px',borderBottom:'1px solid var(--line,#f0f0f0)',cursor:'pointer',background:n.is_read?'transparent':'var(--accent-soft,#eef4ff)'}}>
+               <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:3}}>
+                 <span style={{width:7,height:7,borderRadius:'50%',flexShrink:0,background:n.level==='error'?'#e0483d':n.level==='warn'?'#e08c1a':'#2563eb'}}></span>
+                 <span style={{fontWeight:600,fontSize:13}}>{n.title}</span></div>
+               {n.body&&<div className="dim" style={{fontSize:12,whiteSpace:'pre-wrap',marginLeft:14,lineHeight:1.5}}>{n.body}</div>}
+               <div className="dim" style={{fontSize:11,marginLeft:14,marginTop:4}}>{fmt(n.created_at)}</div>
+             </div>)}
+          </div>}
+        </div>
+      </header>
+      <div className="content">{PAGES[page]}</div>
+    </main>
+    {toastMsg&&<div className={'toast '+(toastMsg.type||'')}>{toastMsg.type==='ok'?I.check:toastMsg.type==='err'?I.x:null}{toastMsg.m}</div>}
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

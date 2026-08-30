@@ -1,0 +1,24 @@
+[Unit]
+Description=FaxApp - 팩스 업무 애플리케이션 (FastAPI)
+# 네트워크와 PostgreSQL이 준비된 후 시작
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+# 실행 사용자 (필요시 faxapp 전용 계정으로 변경)
+User=root
+# 앱 루트 디렉토리
+WorkingDirectory=/opt/faxapp/web
+# uvicorn 실행 (경로는 which uvicorn 결과에 맞게 조정될 수 있음)
+ExecStart=/usr/local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8100
+# 비정상 종료 시 자동 재시작
+Restart=always
+RestartSec=5
+# 로그를 journald로
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=faxapp
+
+[Install]
+WantedBy=multi-user.target
