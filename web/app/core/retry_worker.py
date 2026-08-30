@@ -220,10 +220,22 @@ async def _loop():
     global _running
     _running = True
     logger.info(f'재시도 워커 시작 (주기 {POLL_INTERVAL}초)')
+    _cleanup_tick = 0
     while _running:
         try:
             # 블로킹 DB 작업을 스레드에서
             await asyncio.to_thread(run_once)
+            # 주기적으로 만료 세션 정리 (메모리 누수 방지). 약 10주기마다.
+            _cleanup_tick += 1
+            if _cleanup_tick >= 10:
+                _cleanup_tick = 0
+                try:
+                    from . import security
+                    n = security.cleanup_expired()
+                    if n:
+                        logger.info(f'만료 세션 {n}개 정리')
+                except Exception as e:
+                    logger.warning(f'세션 정리 오류(무시): {e}')
         except Exception as e:
             logger.error(f'워커 주기 오류(계속 진행): {e}')
         await asyncio.sleep(POLL_INTERVAL)

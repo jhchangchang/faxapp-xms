@@ -99,3 +99,29 @@ class TestExceptionResponses:
 
     def test_user_errors_are_4xx(self):
         assert 400 <= errors.InvalidFaxNumber().http_status < 500
+
+
+class TestLoginBruteForce:
+    """로그인 브루트포스 방어."""
+
+    def setup_method(self):
+        ratelimit.reset()
+
+    def test_login_rate_limit_exists(self):
+        # auth.py에 로그인 rate 체크 함수가 있는지
+        from app.routers import auth
+        assert hasattr(auth, '_check_login_rate')
+
+    def test_login_blocks_after_many_attempts(self):
+        from app.routers import auth
+        from app.core import errors
+        ratelimit.reset()
+        # 같은 IP로 반복 시도 → 11회째 차단 (분당 10회 한도)
+        blocked = False
+        for i in range(15):
+            try:
+                auth._check_login_rate('9.9.9.9', 'victim')
+            except errors.RateLimitError:
+                blocked = True
+                break
+        assert blocked, "로그인 시도가 무한 허용됨 (브루트포스 취약)"

@@ -528,8 +528,6 @@ class SendResultBody(BaseModel):
     # ── 엔진 호환 확장 필드 (XMS 엔진 등이 추가로 보낼 수 있음) ──
     retryable: Optional[bool] = None         # 엔진이 판단한 재시도 가능 여부 (힌트)
     sip_code: Optional[str] = None           # SIP 응답 코드 (486, 404 등)
-    direction: Optional[str] = None          # 'receive'면 수신 통지 (발송 아님)
-    recv_file: Optional[str] = None          # 수신 파일 경로 (direction=receive)
 
 
 # faxdiag 카테고리 → 앱 예외 클래스 매핑 (팩스 서버 분류와 정렬)
@@ -616,9 +614,6 @@ def send_result_webhook(body: SendResultBody, request: Request):
     """
     # 인증: 위조 결과 주입 방어 (IP + 토큰)
     _verify_webhook(request)
-    # 0. 수신 통지 (엔진이 인바운드 팩스를 받은 경우) — 발송 job 매칭 대상 아님
-    if body.direction == 'receive':
-        return _handle_receive_notify(body)
 
     # 1. server_job_id로 해당 job 조회
     job = db.query_one(
@@ -662,35 +657,6 @@ def send_result_webhook(body: SendResultBody, request: Request):
     engine_permanent = (body.retryable is False)
     return _apply_failure(job, exc, extra_pages=body.pages_sent,
                           engine_permanent=engine_permanent)
-
-
-def _handle_receive_notify(body: 'SendResultBody'):
-    """엔진이 인바운드 팩스를 수신했을 때의 통지 처리.
-    발송 job과 무관하게 수신 기록을 fax_received 테이블에 저장.
-    실제 스키마: from_number, to_number, file_path, pages, rate, received_at.
-    """
-    try:
-        from ..core import db as _db
-        # 수신 성공한 경우만 기록 (실패는 로그만)
-        if not body.success:
-            error_handler.log_error(
-                errors.TransmissionError(detail=f'수신 실패: {body.result_text}'),
-                path='/api/fax/webhook/result')
-            return {'ok': True, 'direction': 'receive', 'stored': False,
-                    'reason': 'recv_failed'}
-        # 수신 기록 저장 (fax_received). 발신번호는 sip_code에 담겨올 수 있음.
-        _db.execute(
-            "INSERT INTO fax_received (from_number, file_path, pages, rate, received_at) "
-            "VALUES (%s,%s,%s,%s, now())",
-            (body.sip_code or None, body.recv_file,
-             body.pages_sent or 0, body.transfer_rate))
-        return {'ok': True, 'direction': 'receive', 'stored': True}
-    except Exception as e:
-        # 수신 저장 실패해도 webhook은 정상 응답 (엔진 재시도 폭주 방지)
-        error_handler.log_error(
-            errors.TransmissionError(detail=f'수신 통지 저장 실패: {e}'),
-            path='/api/fax/webhook/result')
-        return {'ok': False, 'direction': 'receive', 'reason': 'store_failed'}
 
 
 def _save_diag_fields(job_id, body: 'SendResultBody'):

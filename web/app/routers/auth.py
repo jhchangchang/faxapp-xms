@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from ..core import db, security, config, errors
+from ..core import ratelimit
 from ..deps import get_current_user, COOKIE_NAME
 
 router = APIRouter(prefix='/api/auth', tags=['auth'])
@@ -14,6 +15,20 @@ router = APIRouter(prefix='/api/auth', tags=['auth'])
 class LoginBody(BaseModel):
     username: str
     password: str
+
+
+def _check_login_rate(ip, username):
+    """로그인 브루트포스 방어. IP당 + 계정당 시도 제한.
+    분당 10회, 시간당 30회 초과 시 차단."""
+    for key in (f'login:ip:{ip}', f'login:user:{username}'):
+        try:
+            ratelimit.check(key + ':min', 10, 60)
+            ratelimit.check(key + ':hour', 30, 3600)
+        except ratelimit.RateLimitExceeded as e:
+            raise errors.RateLimitError(
+                retry_after=e.retry_after,
+                detail='로그인 시도 초과',
+                context={'reason': 'too_many_login_attempts'})
 
 
 def _audit(user_id, action, detail, ip):
@@ -30,6 +45,8 @@ def _audit(user_id, action, detail, ip):
 def login(body: LoginBody, response: Response, request: Request):
     """로그인 - 성공 시 세션 쿠키 설정."""
     ip = request.client.host if request.client else ''
+    # 브루트포스 방어 (비밀번호 검증 전에 시도 횟수 제한)
+    _check_login_rate(ip, body.username)
     # 사용자 조회
     row = db.query_one(
         'SELECT id, username, password_hash, display_name, role, is_active '
