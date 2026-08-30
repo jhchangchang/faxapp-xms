@@ -1,85 +1,90 @@
 """
-알림 라우터 - 알림 조회/읽음 처리 + 웹훅 설정.
+알림 코어 로직 - notifications 테이블 CRUD.
+라우터(routers/notify.py)가 호출하는 실제 구현.
+
+주의: 이 파일은 '코어 로직'이어야 함 (라우터 아님).
+      과거 라우터 코드가 잘못 복사된 적 있어 재작성됨.
 """
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
-from typing import Optional
-
-from ..core import db, notify, errors
-from ..deps import get_current_user, require_admin
-
-router = APIRouter(prefix='/api/notify', tags=['notifications'])
+from . import db
 
 
-@router.get('/list')
-def list_notifications(unread_only: bool = False, limit: int = 50, user=Depends(get_current_user)):
-    """내 알림 목록."""
-    return notify.list_for_user(user, limit=limit, unread_only=unread_only)
+def create(title, body='', level='info', category=None,
+           user_id=None, ref_type=None, ref_id=None):
+    """알림 생성. user_id=None이면 전체(관리자) 대상.
+    실패해도 예외를 올리지 않음 (알림은 부가기능, 본 기능 방해 금지)."""
+    try:
+        db.execute(
+            'INSERT INTO notifications(user_id, level, title, body, category, '
+            'ref_type, ref_id) VALUES(%s,%s,%s,%s,%s,%s,%s)',
+            (user_id, level, title[:120], body, category, ref_type, ref_id))
+    except Exception:
+        # 알림 저장 실패가 본 기능(발송 등)을 막으면 안 됨
+        pass
 
 
-@router.get('/unread-count')
-def unread(user=Depends(get_current_user)):
-    """안 읽은 알림 수 (종 아이콘 뱃지용)."""
-    return {'unread': notify.unread_count(user)}
+def list_for_user(user, limit=50, unread_only=False):
+    """사용자의 알림 목록. user_id 매칭 + 전체대상(user_id NULL) 포함.
+    admin은 전체 대상 알림도 봄."""
+    limit = min(int(limit or 50), 200)
+    uid = user.get('user_id') if isinstance(user, dict) else user
+    role = user.get('role') if isinstance(user, dict) else None
 
-
-@router.post('/{notif_id}/read')
-def read_one(notif_id: int, user=Depends(get_current_user)):
-    notify.mark_read(notif_id, user)
-    return {'ok': True}
-
-
-@router.post('/read-all')
-def read_all(user=Depends(get_current_user)):
-    notify.mark_all_read(user)
-    return {'ok': True}
-
-
-@router.delete('/clear-all')
-def clear_all_notifications(confirm: bool = Query(default=False),
-                            user=Depends(get_current_user)):
-    """내 알림 전체 삭제 (초기화). confirm=true 필수.
-    admin/manager는 공용 알림(user_id IS NULL)도 함께 삭제."""
-    if not confirm:
-        return {'ok': False, 'message': 'confirm=true 파라미터가 필요합니다'}
-    uid = user['user_id']
-    if user['role'] in ('admin', 'manager'):
-        cnt = db.query_one("SELECT COUNT(*) AS c FROM notifications "
-                           "WHERE user_id=%s OR user_id IS NULL", (uid,))
-        total = (cnt or {}).get('c', 0)
-        db.execute("DELETE FROM notifications WHERE user_id=%s OR user_id IS NULL", (uid,))
+    cond = []
+    params = []
+    if role == 'admin':
+        # 관리자: 자기 것 + 전체대상(NULL)
+        cond.append('(user_id = %s OR user_id IS NULL)')
+        params.append(uid)
     else:
-        cnt = db.query_one("SELECT COUNT(*) AS c FROM notifications WHERE user_id=%s", (uid,))
-        total = (cnt or {}).get('c', 0)
-        db.execute("DELETE FROM notifications WHERE user_id=%s", (uid,))
-    return {'ok': True, 'deleted': total, 'message': f'알림 {total}건 삭제됨'}
+        cond.append('user_id = %s')
+        params.append(uid)
+    if unread_only:
+        cond.append('is_read = FALSE')
+
+    where = ' AND '.join(cond)
+    params.append(limit)
+    rows = db.query(
+        f'SELECT id, level, title, body, category, ref_type, ref_id, '
+        f'is_read, created_at FROM notifications WHERE {where} '
+        f'ORDER BY created_at DESC LIMIT %s',
+        tuple(params))
+    return rows or []
 
 
-class WebhookConfig(BaseModel):
-    webhook_url: Optional[str] = None
-    notify_on_fail: bool = True
-    notify_on_recv: bool = False
+def unread_count(user):
+    """안 읽은 알림 수 (종 아이콘 뱃지용)."""
+    uid = user.get('user_id') if isinstance(user, dict) else user
+    role = user.get('role') if isinstance(user, dict) else None
+    if role == 'admin':
+        row = db.query_one(
+            'SELECT COUNT(*) AS n FROM notifications '
+            'WHERE (user_id = %s OR user_id IS NULL) AND is_read = FALSE', (uid,))
+    else:
+        row = db.query_one(
+            'SELECT COUNT(*) AS n FROM notifications '
+            'WHERE user_id = %s AND is_read = FALSE', (uid,))
+    return row['n'] if row else 0
 
 
-@router.get('/config')
-def get_config(user=Depends(require_admin)):
-    """웹훅 설정 조회 (관리자)."""
-    cfg = db.query_one('SELECT webhook_url, notify_on_fail, notify_on_recv FROM notify_config WHERE id=1')
-    return cfg or {'webhook_url': None, 'notify_on_fail': True, 'notify_on_recv': False}
+def mark_read(notif_id, user):
+    """알림 하나 읽음 처리 (본인 것만)."""
+    uid = user.get('user_id') if isinstance(user, dict) else user
+    role = user.get('role') if isinstance(user, dict) else None
+    if role == 'admin':
+        db.execute('UPDATE notifications SET is_read=TRUE WHERE id=%s '
+                   'AND (user_id=%s OR user_id IS NULL)', (notif_id, uid))
+    else:
+        db.execute('UPDATE notifications SET is_read=TRUE WHERE id=%s AND user_id=%s',
+                   (notif_id, uid))
 
 
-@router.post('/config')
-def set_config(body: WebhookConfig, user=Depends(require_admin)):
-    """웹훅 설정 저장 (관리자)."""
-    db.execute(
-        'UPDATE notify_config SET webhook_url=%s, notify_on_fail=%s, notify_on_recv=%s WHERE id=1',
-        (body.webhook_url, body.notify_on_fail, body.notify_on_recv))
-    return {'ok': True}
-
-
-@router.post('/test')
-def test_notification(user=Depends(require_admin)):
-    """테스트 알림 발송 (웹훅 설정 확인용)."""
-    notify.create('테스트 알림', '알림 설정이 정상 동작합니다.',
-                  level='info', category='system', user_id=user['user_id'])
-    return {'ok': True, 'message': '테스트 알림을 보냈습니다'}
+def mark_all_read(user):
+    """내 알림 전부 읽음 처리."""
+    uid = user.get('user_id') if isinstance(user, dict) else user
+    role = user.get('role') if isinstance(user, dict) else None
+    if role == 'admin':
+        db.execute('UPDATE notifications SET is_read=TRUE '
+                   'WHERE (user_id=%s OR user_id IS NULL) AND is_read=FALSE', (uid,))
+    else:
+        db.execute('UPDATE notifications SET is_read=TRUE '
+                   'WHERE user_id=%s AND is_read=FALSE', (uid,))
