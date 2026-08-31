@@ -309,6 +309,16 @@ def list_jobs(limit: int = 50, user=Depends(get_current_user)):
         (user['user_id'], min(limit, 200)))
 
 
+@router.get('/jobs/stats-quick')
+def jobs_quick_stats(user=Depends(get_current_user)):
+    """발송 상태별 건수 (관리 화면용)."""
+    where = '' if user['role'] in ('admin', 'manager') else 'WHERE user_id=%s'
+    params = () if user['role'] in ('admin', 'manager') else (user['user_id'],)
+    rows = db.query(
+        f"SELECT status, COUNT(*) AS c FROM fax_jobs {where} GROUP BY status", params)
+    return {r['status']: r['c'] for r in rows}
+
+
 @router.get('/jobs/{job_id}')
 def job_detail(job_id: int, user=Depends(get_current_user)):
     """발송 작업 상세 + 팩스 서버 상태 동기화."""
@@ -476,14 +486,81 @@ def cleanup_old_jobs(days: int = 30, user=Depends(require_admin)):
     return {'ok': True, 'message': f'{days}일 이전 완료 건 정리됨'}
 
 
-@router.get('/jobs/stats-quick')
-def jobs_quick_stats(user=Depends(get_current_user)):
-    """발송 상태별 건수 (관리 화면용)."""
-    where = '' if user['role'] in ('admin', 'manager') else 'WHERE user_id=%s'
-    params = () if user['role'] in ('admin', 'manager') else (user['user_id'],)
-    rows = db.query(
-        f"SELECT status, COUNT(*) AS c FROM fax_jobs {where} GROUP BY status", params)
-    return {r['status']: r['c'] for r in rows}
+class BulkIdsBody(BaseModel):
+    ids: list[int]
+    force: bool = False   # True면 진행중(queued 등)도 삭제 (관리자용)
+
+
+@router.post('/jobs/bulk-delete')
+def bulk_delete_jobs(body: BulkIdsBody, user=Depends(get_current_user)):
+    """선택한 발송 이력 일괄 삭제.
+    기본: 완료/실패/취소 건만 삭제 (진행 중 보호).
+    force=True(관리자만): 상태 무관하게 삭제 - 멈춘 queued 등 청소용."""
+    ids = [int(i) for i in (body.ids or [])][:1000]
+    if not ids:
+        return {'ok': True, 'deleted': 0, 'skipped': 0, 'message': '선택된 항목 없음'}
+
+    is_admin = user['role'] == 'admin'
+    force = body.force and is_admin   # force는 관리자만
+
+    if force:
+        # 강제 삭제: 상태 무관 (멈춘 queued 등 청소). 관리자 전용.
+        if is_admin:
+            deletable = db.query("SELECT id FROM fax_jobs WHERE id = ANY(%s)", (ids,))
+        else:
+            deletable = db.query(
+                "SELECT id FROM fax_jobs WHERE id = ANY(%s) AND user_id = %s",
+                (ids, user['user_id']))
+    else:
+        # 일반: 완료/실패/취소만 (진행 중 보호)
+        if is_admin:
+            deletable = db.query(
+                "SELECT id FROM fax_jobs WHERE id = ANY(%s) "
+                "AND status IN ('sent','failed','cancelled')", (ids,))
+        else:
+            deletable = db.query(
+                "SELECT id FROM fax_jobs WHERE id = ANY(%s) AND user_id = %s "
+                "AND status IN ('sent','failed','cancelled')", (ids, user['user_id']))
+    del_ids = [r['id'] for r in (deletable or [])]
+    skipped = len(ids) - len(del_ids)
+
+    if del_ids:
+        db.execute("DELETE FROM fax_jobs WHERE id = ANY(%s)", (del_ids,))
+    _audit(user['user_id'], 'bulk_delete',
+           f'{len(del_ids)}건 삭제, {skipped}건 건너뜀{" (force)" if force else ""}')
+    msg = f'{len(del_ids)}건 삭제됨'
+    if skipped:
+        msg += f' ({skipped}건은 진행 중이라 제외)'
+    return {'ok': True, 'deleted': len(del_ids), 'skipped': skipped, 'message': msg}
+
+
+@router.post('/jobs/bulk-cancel')
+def bulk_cancel_jobs(body: BulkIdsBody, user=Depends(get_current_user)):
+    """선택한 발송 이력 일괄 취소.
+    대기(pending/queued/retry_wait)인 건만 취소. 이미 전송된 건은 건너뜀."""
+    ids = [int(i) for i in (body.ids or [])][:1000]
+    if not ids:
+        return {'ok': True, 'cancelled': 0, 'skipped': 0, 'message': '선택된 항목 없음'}
+
+    is_admin = user['role'] == 'admin'
+    if is_admin:
+        cancelable = db.query(
+            "SELECT id FROM fax_jobs WHERE id = ANY(%s) "
+            "AND status IN ('pending','queued','retry_wait')", (ids,))
+    else:
+        cancelable = db.query(
+            "SELECT id FROM fax_jobs WHERE id = ANY(%s) AND user_id = %s "
+            "AND status IN ('pending','queued','retry_wait')", (ids, user['user_id']))
+    can_ids = [r['id'] for r in (cancelable or [])]
+    skipped = len(ids) - len(can_ids)
+
+    if can_ids:
+        db.execute("UPDATE fax_jobs SET status='cancelled' WHERE id = ANY(%s)", (can_ids,))
+    _audit(user['user_id'], 'bulk_cancel', f'{len(can_ids)}건 취소, {skipped}건 건너뜀')
+    msg = f'{len(can_ids)}건 취소됨'
+    if skipped:
+        msg += f' ({skipped}건은 취소 불가 상태라 제외)'
+    return {'ok': True, 'cancelled': len(can_ids), 'skipped': skipped, 'message': msg}
 
 
 @router.get('/retry-queue')

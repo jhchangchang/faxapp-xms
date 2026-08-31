@@ -96,6 +96,60 @@ def inbox(unread_only: bool = False, limit: int = 50, user=Depends(get_current_u
     return db.query(sql, tuple(params))
 
 
+class RecvBulkBody(BaseModel):
+    ids: list[int]
+
+
+def _recv_access_filter(user):
+    """수신 삭제/조회 시 권한별 WHERE 조건 반환. (cond_list, params)."""
+    if user['role'] == 'admin':
+        return [], []
+    me = db.query_one('SELECT dept_id FROM users WHERE id=%s', (user['user_id'],))
+    dept = me['dept_id'] if me else None
+    if user['role'] == 'manager':
+        return ['dept_id = %s'], [dept]
+    else:
+        return ['(user_id = %s OR (dept_id = %s AND user_id IS NULL))'], [user['user_id'], dept]
+
+
+@router.post('/bulk-delete')
+def bulk_delete_received(body: RecvBulkBody, user=Depends(get_current_user)):
+    """선택한 수신 팩스 일괄 삭제.
+    권한 범위 내(본인/부서/관리자 전체)의 것만 삭제."""
+    ids = [int(i) for i in (body.ids or [])][:1000]
+    if not ids:
+        return {'ok': True, 'deleted': 0, 'message': '선택된 항목 없음'}
+
+    cond, params = _recv_access_filter(user)
+    where = 'WHERE id = ANY(%s)'
+    q_params = [ids]
+    if cond:
+        where += ' AND ' + ' AND '.join(cond)
+        q_params += params
+    # 삭제 가능한(권한 있는) id 조회
+    rows = db.query(f'SELECT id FROM fax_received {where}', tuple(q_params))
+    del_ids = [r['id'] for r in (rows or [])]
+    skipped = len(ids) - len(del_ids)
+
+    if del_ids:
+        db.execute('DELETE FROM fax_received WHERE id = ANY(%s)', (del_ids,))
+    msg = f'{len(del_ids)}건 삭제됨'
+    if skipped:
+        msg += f' ({skipped}건은 권한 없음)'
+    return {'ok': True, 'deleted': len(del_ids), 'skipped': skipped, 'message': msg}
+
+
+@router.delete('/{recv_id}')
+def delete_received(recv_id: int, user=Depends(get_current_user)):
+    """수신 팩스 1건 삭제 (권한 확인)."""
+    row = db.query_one('SELECT * FROM fax_received WHERE id=%s', (recv_id,))
+    if not row:
+        raise errors.NotFound('수신 팩스')
+    _check_access(row, user)
+    db.execute('DELETE FROM fax_received WHERE id=%s', (recv_id,))
+    return {'ok': True}
+
+
 @router.get('/{recv_id}')
 def receive_detail(recv_id: int, user=Depends(get_current_user)):
     """수신 팩스 상세."""

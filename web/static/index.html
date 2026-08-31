@@ -322,11 +322,22 @@ function Send({toast}){
 const ST={sent:['b-ok','완료'],failed:['b-err','실패'],queued:['b-wait','대기'],pending:['b-wait','준비'],sending:['b-wait','전송중'],retry_wait:['b-wait','재시도 대기'],cancelled:['b-dim','취소']};
 function SendHistory({toast}){
   const [jobs,setJobs]=useState(null),[pv,setPv]=useState(null),[filter,setFilter]=useState(''),[stats,setStats]=useState({}),[busy,setBusy]=useState(false);
-  const load=()=>{api('/api/fax/jobs-filtered'+(filter?'?status='+filter:'')).then(setJobs).catch(()=>setJobs([]));api('/api/fax/jobs/stats-quick').then(setStats).catch(()=>{});};
+  const [sel,setSel]=useState(new Set());
+  const load=()=>{api('/api/fax/jobs-filtered'+(filter?'?status='+filter:'')).then(setJobs).catch(()=>setJobs([]));api('/api/fax/jobs/stats-quick').then(setStats).catch(()=>{});setSel(new Set());};
   useEffect(()=>{load();},[filter]);
   const act=async(fn,msg)=>{try{const r=await fn();toast(r.message||msg,'ok');load();}catch(e){toast(e.message,'err');}};
   const sync=async()=>{setBusy(true);await act(()=>api('/api/fax/jobs/sync',{method:'POST'}),'동기화 완료');setBusy(false);};
-  const cancelAll=()=>{if(confirm('대기 중인 발송을 모두 취소할까요?'))act(()=>api('/api/fax/jobs/cancel-pending',{method:'POST'}),'취소 완료');};
+  const cancelAll=()=>{act(()=>api('/api/fax/jobs/cancel-pending',{method:'POST'}),'대기 건 취소 완료');};
+  // 선택 토글 (함수형 업데이트로 최신 상태 보장)
+  const toggle=(id)=>{setSel(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});};
+  const toggleAll=()=>{setSel(prev=>prev.size===(jobs||[]).length?new Set():new Set((jobs||[]).map(j=>j.id)));};
+  // 선택 일괄 삭제/취소
+  const bulkDelete=async(force=false)=>{const ids=[...sel];if(!ids.length){toast('삭제할 항목을 선택하세요','err');return;}
+    try{const r=await api('/api/fax/jobs/bulk-delete',{method:'POST',body:J({ids,force})});
+      toast(r.message||'삭제 완료','ok');
+      setSel(new Set());load();
+    }catch(e){toast(e.message,'err');}};
+  const bulkCancel=async()=>{const ids=[...sel];if(!ids.length){toast('취소할 항목을 선택하세요','err');return;}try{const r=await api('/api/fax/jobs/bulk-cancel',{method:'POST',body:J({ids})});toast(r.message||'취소 완료','ok');setSel(new Set());load();}catch(e){toast(e.message,'err');}};
   const pending=(stats.queued||0)+(stats.pending||0);
   const retryWait=stats.retry_wait||0;
   const FILT=[['','전체'],['sent','완료'],['queued','대기'],['retry_wait','재시도'],['failed','실패'],['cancelled','취소']];
@@ -346,10 +357,14 @@ function SendHistory({toast}){
         {retryWait>0&&<button className="btn btn-s" onClick={()=>act(()=>api('/api/fax/retry-now',{method:'POST'}),'재시도 실행됨')}>지금 재시도</button>}
         {pending>0&&<button className="btn btn-s btn-err" onClick={cancelAll}>대기 전체취소</button>}
         {(stats.failed||0)>0&&<button className="btn btn-s" onClick={()=>act(()=>api('/api/fax/jobs/resend-failed',{method:'POST'}),'재전송 요청됨')}>실패 재전송</button>}
+        {sel.size>0&&<button className="btn btn-s" onClick={bulkCancel}>선택 취소 ({sel.size})</button>}
+        {sel.size>0&&<button className="btn btn-s btn-err" onClick={()=>bulkDelete(false)}>선택 삭제 ({sel.size})</button>}
+        {sel.size>0&&<button className="btn btn-s btn-err" onClick={()=>bulkDelete(true)}>강제 삭제 ({sel.size})</button>}
         <a className="btn btn-s" href={API+'/api/data/export/send-history'+(filter?'?status='+filter:'')} download>{I.download}엑셀</a>
       </div></div>
-      {jobs.length?<table className="tbl"><thead><tr><th>시각</th><th>받는번호</th><th>받는사람</th><th>파일</th><th className="num">쪽</th><th>상태</th><th></th></tr></thead>
+      {jobs.length?<table className="tbl"><thead><tr><th style={{width:32}}><input type="checkbox" checked={sel.size>0&&sel.size===jobs.length} onChange={toggleAll}/></th><th>시각</th><th>받는번호</th><th>받는사람</th><th>파일</th><th className="num">쪽</th><th>상태</th><th></th></tr></thead>
       <tbody>{jobs.map(j=>{const a=ST[j.status]||['b-dim',j.status];return <tr key={j.id}>
+        <td><input type="checkbox" checked={sel.has(j.id)} onChange={()=>toggle(j.id)}/></td>
         <td className="mono dim">{fmt(j.created_at)}</td><td className="mono">{j.to_number}</td><td>{j.to_name||'-'}</td>
         <td className="dim">{j.file_name||'-'}{j.cover_used&&<span style={{marginLeft:6,color:'var(--accent)'}}>표지</span>}</td>
         <td className="num mono">{j.pages||0}</td><td><span className={'badge '+a[0]}>{a[1]}</span></td>
@@ -365,8 +380,13 @@ function SendHistory({toast}){
 function Inbox({toast,user}){
   const [list,setList]=useState(null),[pv,setPv]=useState(null),[memoId,setMemoId]=useState(null),[memoText,setMemoText]=useState(''),[users,setUsers]=useState([]);
   const [fwd,setFwd]=useState(null),[fwdNum,setFwdNum]=useState(''),[fwdName,setFwdName]=useState(''),[fwdBusy,setFwdBusy]=useState(false);
-  const load=()=>api('/api/receive/inbox').then(setList).catch(()=>setList([]));
+  const [sel,setSel]=useState(new Set());
+  const load=()=>{api('/api/receive/inbox').then(setList).catch(()=>setList([]));setSel(new Set());};
   useEffect(()=>{load();if(user.role==='admin'||user.role==='manager')api('/api/users').then(setUsers).catch(()=>{});},[]);
+  const toggle=(id)=>{setSel(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});};
+  const toggleAll=()=>{setSel(prev=>prev.size===(list||[]).length?new Set():new Set((list||[]).map(r=>r.id)));};
+  const bulkDelete=async()=>{const ids=[...sel];if(!ids.length){toast('삭제할 항목을 선택하세요','err');return;}
+    try{const r=await api('/api/receive/bulk-delete',{method:'POST',body:J({ids})});toast(r.message||'삭제 완료','ok');setSel(new Set());load();}catch(e){toast(e.message,'err');}};
   const saveMemo=async id=>{try{await api('/api/receive/'+id+'/memo',{method:'POST',body:J({memo:memoText})});toast('메모 저장됨','ok');setMemoId(null);load();}catch(e){toast(e.message,'err');}};
   const assign=async(id,uid)=>{if(!uid)return;try{await api('/api/receive/'+id+'/assign?target_user_id='+uid,{method:'POST'});toast('배정 완료','ok');load();}catch(e){toast(e.message,'err');}};
   const doForward=async()=>{if(!fwdNum.trim())return toast('전달할 번호를 입력하세요','err');setFwdBusy(true);
@@ -376,11 +396,11 @@ function Inbox({toast,user}){
   if(!list)return <Loading/>;
   return <div className="card">
     <div className="card-h"><div className="card-t">받은 팩스 {list.length>0&&<span className="muted">· {list.length}건</span>}</div>
-      <div className="btn-row"><a className="btn btn-s" href={API+'/api/data/export/received'} download>{I.download}엑셀</a><button className="btn btn-s" onClick={load}>{I.refresh}새로고침</button></div></div>
-    {list.length?<table className="tbl"><thead><tr><th style={{width:8}}></th><th>수신시각</th><th>발신번호</th><th>수신번호</th><th className="num">쪽</th><th>메모</th>{canAssign&&<th>배정</th>}<th></th></tr></thead>
+      <div className="btn-row">{sel.size>0&&<button className="btn btn-s btn-err" onClick={bulkDelete}>선택 삭제 ({sel.size})</button>}<a className="btn btn-s" href={API+'/api/data/export/received'} download>{I.download}엑셀</a><button className="btn btn-s" onClick={load}>{I.refresh}새로고침</button></div></div>
+    {list.length?<table className="tbl"><thead><tr><th style={{width:32}}><input type="checkbox" checked={sel.size>0&&sel.size===list.length} onChange={toggleAll}/></th><th>수신시각</th><th>발신번호</th><th>수신번호</th><th className="num">쪽</th><th>메모</th>{canAssign&&<th>배정</th>}<th></th></tr></thead>
     <tbody>{list.map(r=><tr key={r.id}>
-      <td>{!r.is_read&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)',display:'inline-block'}}/>}</td>
-      <td className="mono dim">{fmt(r.received_at)}</td><td className="mono">{r.from_number||'-'}</td><td className="mono">{r.to_number||'-'}</td><td className="num mono">{r.pages||0}</td>
+      <td><input type="checkbox" checked={sel.has(r.id)} onChange={()=>toggle(r.id)}/></td>
+      <td className="mono dim">{!r.is_read&&<span style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)',display:'inline-block',marginRight:6}}/>}{fmt(r.received_at)}</td><td className="mono">{r.from_number||'-'}</td><td className="mono">{r.to_number||'-'}</td><td className="num mono">{r.pages||0}</td>
       <td>{memoId===r.id?<span className="inline-edit"><input value={memoText} onChange={e=>setMemoText(e.target.value)} autoFocus onKeyDown={e=>e.key==='Enter'&&saveMemo(r.id)}/><button className="btn btn-x btn-a" onClick={()=>saveMemo(r.id)}>{I.check}</button></span>
         :<span className="link" onClick={()=>{setMemoId(r.id);setMemoText(r.memo||'');}}>{r.memo||'메모 추가'}</span>}</td>
       {canAssign&&<td><select defaultValue="" onChange={e=>assign(r.id,e.target.value)} style={{padding:'4px 8px',border:'1px solid var(--border-strong)',borderRadius:5,fontSize:12}}><option value="">{r.user_id?'재배정':'배정'}</option>{users.map(u=><option key={u.id} value={u.id}>{u.display_name}</option>)}</select></td>}
