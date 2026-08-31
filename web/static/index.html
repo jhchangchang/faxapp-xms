@@ -214,22 +214,95 @@ function Login({onLogin}){
     <button className="btn-primary" onClick={submit} disabled={busy}>{busy?'로그인 중…':'로그인'}</button>
   </div></div>;
 }
-function Dashboard(){
-  const [s,setS]=useState(null),[daily,setDaily]=useState(null);
-  useEffect(()=>{api('/api/stats/summary').then(setS).catch(()=>{});api('/api/stats/daily?days=14').then(setDaily).catch(()=>setDaily({sent:[],received:[]}));},[]);
-  if(!s)return <Loading/>;
+function Dashboard({setPage}){
+  const [d,setD]=useState(null),[daily,setDaily]=useState(null);
+  const load=()=>{api('/api/stats/dashboard').then(setD).catch(()=>{});api('/api/stats/daily?days=14').then(setDaily).catch(()=>setDaily({sent:[],received:[]}));};
+  useEffect(()=>{load();const t=setInterval(load,15000);return()=>clearInterval(t);},[]);  // 15초마다 자동 갱신
+  if(!d)return <Loading/>;
+  const eng=d.engine||{};
+  const act=d.action_needed||{};
+  const today=d.today||{};
+  const proc=d.processing||{};
+  const diff=today.total-today.yesterday;
   return <div>
-    <div className="stats-grid">
-      <div className="stat"><div className="lbl"><span className="dot ok"/>전송 성공률</div><div className="num">{s.success_rate}%</div><div className="meta">전체 {s.sent.total}건 기준</div></div>
-      <div className="stat"><div className="lbl"><span className="dot"/>오늘 발송</div><div className="num">{s.today.sent}</div><div className="meta">성공 {s.today.ok}건</div></div>
-      <div className="stat"><div className="lbl"><span className="dot wait"/>발송 대기</div><div className="num">{s.sent.in_progress}</div><div className="meta">처리 대기 중</div></div>
-      <div className="stat"><div className="lbl"><span className="dot err"/>안읽은 수신</div><div className="num">{s.received.unread}</div><div className="meta">전체 {s.received.total}건 수신</div></div>
+    {/* ── 실시간 상태 바 ── */}
+    <div className="card" style={{marginBottom:16}}>
+      <div className="card-b" style={{display:'flex',alignItems:'center',gap:24,flexWrap:'wrap',padding:'16px 20px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{width:12,height:12,borderRadius:'50%',background:eng.ok?'var(--ok)':'var(--err)',boxShadow:eng.ok?'0 0 0 4px rgba(16,168,110,.15)':'0 0 0 4px rgba(229,72,77,.15)'}}/>
+          <div><div style={{fontSize:13,fontWeight:650}}>팩스 엔진 {eng.ok?'정상':'응답 없음'}</div>
+            <div className="dim" style={{fontSize:11}}>{eng.engine||'unknown'} {eng.detail?'· '+eng.detail:''}</div></div>
+        </div>
+        <div style={{height:32,width:1,background:'var(--border)'}}/>
+        <div><div className="dim" style={{fontSize:11}}>처리 중</div><div style={{fontSize:18,fontWeight:700}}>{proc.active}<span className="dim" style={{fontSize:12,fontWeight:400}}> 건</span></div></div>
+        <div><div className="dim" style={{fontSize:11}}>재시도 대기</div><div style={{fontSize:18,fontWeight:700}}>{proc.retry_wait}<span className="dim" style={{fontSize:12,fontWeight:400}}> 건</span></div></div>
+        <div style={{marginLeft:'auto'}}><button className="btn btn-s" onClick={load}>{I.refresh}새로고침</button></div>
+      </div>
     </div>
-    <div className="card"><div className="card-h"><div className="card-t">최근 2주 송수신 추이</div>
-      <div className="chart-legend"><span><i style={{background:'var(--accent)'}}/>발송</span><span><i style={{background:'#a5b4fc'}}/>수신</span></div></div>
-      <div className="card-b"><DailyChart daily={daily}/></div></div>
+
+    {/* ── 조치 필요 (빨간 배지) ── */}
+    {(act.failed_7d>0||act.stuck>0||act.unread>0||act.errors>0)&&
+    <div className="card" style={{marginBottom:16,borderColor:'var(--err)'}}>
+      <div className="card-h"><div className="card-t" style={{color:'var(--err)'}}>⚠ 조치가 필요합니다</div></div>
+      <div className="card-b" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}>
+        {act.stuck>0&&<div className="action-item" onClick={()=>setPage('history')} style={{cursor:'pointer',padding:14,border:'1px solid var(--err)',borderRadius:8,background:'var(--err-bg,#fef2f2)'}}>
+          <div style={{fontSize:22,fontWeight:750,color:'var(--err)'}}>{act.stuck}</div>
+          <div style={{fontSize:12.5,fontWeight:600}}>멈춘 발송 (10분+)</div>
+          <div className="dim" style={{fontSize:11}}>엔진 확인 필요 →</div></div>}
+        {act.failed_7d>0&&<div className="action-item" onClick={()=>setPage('history')} style={{cursor:'pointer',padding:14,border:'1px solid var(--border)',borderRadius:8}}>
+          <div style={{fontSize:22,fontWeight:750,color:'var(--err)'}}>{act.failed_7d}</div>
+          <div style={{fontSize:12.5,fontWeight:600}}>발송 실패 (7일)</div>
+          <div className="dim" style={{fontSize:11}}>재전송 검토 →</div></div>}
+        {act.unread>0&&<div className="action-item" onClick={()=>setPage('inbox')} style={{cursor:'pointer',padding:14,border:'1px solid var(--border)',borderRadius:8}}>
+          <div style={{fontSize:22,fontWeight:750,color:'var(--accent)'}}>{act.unread}</div>
+          <div style={{fontSize:12.5,fontWeight:600}}>안 읽은 수신</div>
+          <div className="dim" style={{fontSize:11}}>수신함 확인 →</div></div>}
+        {act.errors>0&&<div className="action-item" onClick={()=>setPage('errlog')} style={{cursor:'pointer',padding:14,border:'1px solid var(--border)',borderRadius:8}}>
+          <div style={{fontSize:22,fontWeight:750,color:'var(--warn,#e8930c)'}}>{act.errors}</div>
+          <div style={{fontSize:12.5,fontWeight:600}}>미해결 오류</div>
+          <div className="dim" style={{fontSize:11}}>오류 로그 →</div></div>}
+      </div>
+    </div>}
+
+    {/* ── 오늘 실적 ── */}
+    <div className="stats-grid">
+      <div className="stat"><div className="lbl"><span className="dot"/>오늘 발송</div><div className="num">{today.total}</div>
+        <div className="meta">{diff>=0?'▲':'▼'} 어제 대비 {Math.abs(diff)}건</div></div>
+      <div className="stat"><div className="lbl"><span className="dot ok"/>오늘 성공률</div><div className="num">{today.rate}%</div>
+        <div className="meta">성공 {today.ok} / 실패 {today.fail}</div></div>
+      <div className="stat"><div className="lbl"><span className="dot wait"/>처리 중</div><div className="num">{proc.active}</div>
+        <div className="meta">발송 대기열</div></div>
+      <div className="stat"><div className="lbl"><span className="dot err"/>안읽은 수신</div><div className="num">{act.unread}</div>
+        <div className="meta">확인 필요</div></div>
+    </div>
+
+    {/* ── 추이 + 실패원인 ── */}
+    <div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:16}}>
+      <div className="card"><div className="card-h"><div className="card-t">최근 2주 송수신 추이</div>
+        <div className="chart-legend"><span><i style={{background:'var(--accent)'}}/>발송</span><span><i style={{background:'#a5b4fc'}}/>수신</span></div></div>
+        <div className="card-b"><DailyChart daily={daily}/></div></div>
+      <div className="card"><div className="card-h"><div className="card-t">실패 원인 (7일)</div></div>
+        <div className="card-b">
+          {(d.fail_reasons&&d.fail_reasons.length)?
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              {d.fail_reasons.map((f,i)=>{const max=d.fail_reasons[0].count;return (
+                <div key={i}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,marginBottom:4}}>
+                    <span style={{fontWeight:600}}>{FAULT_LABEL[f.code]||f.code}</span><span className="mono dim">{f.count}건</span></div>
+                  <div style={{height:7,background:'var(--surface-2)',borderRadius:4,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:(f.count/max*100)+'%',background:'var(--err)',borderRadius:4}}/></div>
+                </div>);})}
+            </div>
+            :<div className="dim" style={{textAlign:'center',padding:'30px 0',fontSize:13}}>최근 실패 없음 ✓</div>}
+        </div></div>
+    </div>
   </div>;
 }
+// 실패 코드 → 한글 라벨
+const FAULT_LABEL={INVALID_NUMBER:'번호 오류',BUSY:'통화중',NO_ANSWER:'무응답',
+  TRAINING_FAILED:'신호 협상 실패',REMOTE_INCOMPATIBLE:'상대 장비 비호환',
+  BAD_TIFF:'문서 오류',CONVERSION:'변환 실패',FAX_SERVER:'엔진 오류',
+  TIMEOUT:'시간 초과',SERVICE_BUSY:'서비스 혼잡',UNKNOWN:'기타'};
 function DailyChart({daily}){
   if(!daily)return <Loading/>;
   const days={};
@@ -890,7 +963,7 @@ function App(){
   const nav=NAV.filter(n=>!n.roles||n.roles.includes(user.role));
   const secs=[...new Set(nav.map(n=>n.sec))];
   const ti=TITLES[page]||['',''];
-  const PAGES={dashboard:<Dashboard/>,diag:<Diagnostics toast={toast}/>,send:<Send toast={toast}/>,history:<SendHistory toast={toast}/>,mailmerge:<MailMerge toast={toast}/>,scheduled:<Scheduled toast={toast}/>,inbox:<Inbox toast={toast} user={user}/>,contacts:<Contacts toast={toast}/>,stats:<Stats/>,users:<UserAdmin toast={toast}/>,depts:<DeptAdmin toast={toast}/>,errlog:<ErrorLog toast={toast}/>,notifycfg:<NotifyConfig toast={toast}/>,apikeys:<ApiKeys toast={toast}/>};
+  const PAGES={dashboard:<Dashboard setPage={setPage}/>,diag:<Diagnostics toast={toast}/>,send:<Send toast={toast}/>,history:<SendHistory toast={toast}/>,mailmerge:<MailMerge toast={toast}/>,scheduled:<Scheduled toast={toast}/>,inbox:<Inbox toast={toast} user={user}/>,contacts:<Contacts toast={toast}/>,stats:<Stats/>,users:<UserAdmin toast={toast}/>,depts:<DeptAdmin toast={toast}/>,errlog:<ErrorLog toast={toast}/>,notifycfg:<NotifyConfig toast={toast}/>,apikeys:<ApiKeys toast={toast}/>};
   return <div className="shell">
     <aside className="side">
       <div className="side-top"><div className="mark">{I.fax}</div><div className="nm">FaxApp</div></div>
