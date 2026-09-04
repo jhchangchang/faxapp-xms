@@ -349,6 +349,65 @@ def resend_job(job_id: int, user=Depends(get_current_user)):
         raise errors.FaxServerDown(detail=f'팩스 서버 연결 실패: {e}')
 
 
+class ResendPagesBody(BaseModel):
+    pages: str   # "2,8" 또는 "3-5" 또는 "1,3-5,8"
+
+
+@router.post('/jobs/{job_id}/resend-pages')
+def resend_pages(job_id: int, body: ResendPagesBody, user=Depends(get_current_user)):
+    """선택한 페이지만 재전송 (누락/불량 페이지 대응).
+    예: pages="2,8" → 2·8페이지만 추출해 새 발송.
+    원본에서 해당 페이지만 잘라 새 job으로 발송 (원본 이력 보존)."""
+    job = db.query_one(
+        'SELECT id, user_id, to_number, to_name, file_path, pages FROM fax_jobs WHERE id=%s',
+        (job_id,))
+    if not job or (job['user_id'] != user['user_id'] and user['role'] != 'admin'):
+        raise errors.NotFound('작업')
+    if not job['file_path'] or not os.path.isfile(job['file_path']):
+        raise errors.ValidationError(detail='원본 파일이 없어 재전송할 수 없습니다')
+
+    total = job.get('pages') or convert.count_tiff_pages(job['file_path'])
+    page_list = convert.parse_page_spec(body.pages, total)
+    if not page_list:
+        raise errors.ValidationError(
+            detail=f'유효한 페이지가 없습니다 (전체 {total}페이지). 예: "2,8" 또는 "3-5"')
+
+    # 선택 페이지만 추출
+    import uuid as _uuid
+    out_dir = os.path.dirname(job['file_path'])
+    part_file = os.path.join(out_dir, f'pages_{job_id}_{_uuid.uuid4().hex[:8]}.tif')
+    try:
+        convert.slice_selected_pages(job['file_path'], page_list, part_file)
+    except convert.ConvertError as e:
+        raise errors.ConversionError(detail=f'페이지 추출 실패: {e}')
+
+    # 새 job으로 발송 (원본과 별개, 어느 페이지인지 기록)
+    page_label = body.pages.strip()
+    new_id = db.execute(
+        "INSERT INTO fax_jobs (user_id, to_number, to_name, file_path, pages, "
+        "status, result_text, created_at) "
+        "VALUES (%s,%s,%s,%s,%s,'pending',%s, now()) RETURNING id",
+        (user['user_id'], job['to_number'], job.get('to_name') or '',
+         part_file, len(page_list),
+         f'페이지 재전송 (원본 #{job_id}, {page_label}p)'),
+        returning=True)
+    new_job_id = new_id['id'] if isinstance(new_id, dict) else new_id
+
+    try:
+        resp = faxclient.send_fax(job['to_number'], part_file, async_mode=True,
+                                  job_id=new_job_id)
+        db.execute("UPDATE fax_jobs SET status='queued', server_job_id=%s WHERE id=%s",
+                   (str(resp.get('job_id', '')), new_job_id))
+        _audit(user['user_id'], 'resend_pages',
+               f'job {job_id} → {page_label}p ({len(page_list)}장) 새job {new_job_id}')
+        return {'ok': True, 'new_job_id': new_job_id,
+                'pages': page_list, 'count': len(page_list),
+                'message': f'{len(page_list)}개 페이지({page_label}) 재전송 시작'}
+    except faxclient.FaxServerError as e:
+        db.execute("UPDATE fax_jobs SET status='failed' WHERE id=%s", (new_job_id,))
+        raise errors.FaxServerDown(detail=f'팩스 서버 연결 실패: {e}')
+
+
 @router.get('/formats')
 def supported_formats(user=Depends(get_current_user)):
     """지원 파일 형식."""

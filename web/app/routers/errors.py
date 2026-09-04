@@ -3,6 +3,7 @@
 중앙 예외 모듈이 기록한 error_log를 보여줌 → 가시성의 접점.
 """
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
 from ..core import db
 from ..deps import require_admin
@@ -97,3 +98,24 @@ def clear_all_errors(confirm: bool = Query(default=False),
     total = (cnt or {}).get('c', 0)
     db.execute("DELETE FROM error_log")
     return {'ok': True, 'deleted': total, 'message': f'오류/알람 로그 {total}건 전체 삭제됨'}
+
+
+class ErrorBulkBody(BaseModel):
+    ids: list[int]
+
+
+@router.post('/bulk-delete')
+def bulk_delete_errors(body: ErrorBulkBody, user=Depends(require_admin)):
+    """선택한 오류 로그 일괄 삭제 (관리자)."""
+    ids = [int(i) for i in (body.ids or [])][:1000]
+    if not ids:
+        return {'ok': True, 'deleted': 0, 'message': '선택된 항목 없음'}
+    db.execute("DELETE FROM error_log WHERE id = ANY(%s)", (ids,))
+    return {'ok': True, 'deleted': len(ids), 'message': f'{len(ids)}건 삭제됨'}
+
+
+@router.delete('/{error_id}')
+def delete_error(error_id: int, user=Depends(require_admin)):
+    """오류 로그 1건 삭제 (관리자)."""
+    db.execute("DELETE FROM error_log WHERE id=%s", (error_id,))
+    return {'ok': True}

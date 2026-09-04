@@ -179,6 +179,146 @@ def count_tiff_pages(tiff_path):
     return 1
 
 
+def slice_tiff_pages(src_tiff, start_page, out_tiff, end_page=None):
+    """TIFF에서 start_page~end_page 페이지만 추출해 새 TIFF 생성 (이어보내기용).
+
+    페이지 번호는 1-기반. start_page=49면 49페이지부터 끝까지.
+    실패 시점 이후 페이지만 재전송하여 통신료·시간·수신측 토너 절약.
+
+    우선순위: tiffcp(가장 정확) → ImageMagick convert → 실패 시 예외.
+    반환: out_tiff 경로. 추출 실패 시 ConvertError.
+    """
+    import os
+    total = count_tiff_pages(src_tiff)
+    start = max(1, int(start_page))
+    end = int(end_page) if end_page else total
+    if start > total:
+        raise ConvertError(f'시작 페이지({start})가 전체({total})보다 큼')
+
+    # 방법 1: tiffcp (libtiff) - 0-기반 페이지 지정, 팩스 TIFF에 최적
+    tiffcp = _which('tiffcp')
+    if tiffcp:
+        # tiffcp는 src,N 형식으로 특정 페이지 지정 (0-기반)
+        pages = [f'{src_tiff},{i}' for i in range(start - 1, end)]
+        try:
+            _run([tiffcp] + pages + [out_tiff], timeout=60)
+            if os.path.isfile(out_tiff) and os.path.getsize(out_tiff) > 0:
+                return out_tiff
+        except Exception:
+            pass  # 다음 방법 시도
+
+    # 방법 2: ImageMagick convert - [start-1] ~ [end-1] (0-기반 범위)
+    convert = _which('convert')
+    if convert:
+        rng = f'[{start-1}-{end-1}]' if end > start else f'[{start-1}]'
+        try:
+            _run([convert, src_tiff + rng, '-compress', 'Group4', out_tiff], timeout=60)
+            if os.path.isfile(out_tiff) and os.path.getsize(out_tiff) > 0:
+                return out_tiff
+        except Exception:
+            pass
+
+    raise ConvertError('페이지 슬라이싱 실패 (tiffcp/convert 필요)')
+
+
+def slice_pdf_pages(src_pdf, start_page, out_tiff, end_page=None):
+    """PDF에서 start_page~end_page만 추출해 팩스 TIFF 생성 (gs).
+    원본이 PDF로 보관된 경우의 이어보내기용. 페이지 1-기반."""
+    import os
+    gs = _which('gs') or _which('ghostscript')
+    if not gs:
+        raise ConvertError('gs 미설치 - PDF 페이지 추출 불가')
+    args = [gs, '-q', '-dNOPAUSE', '-dBATCH', '-dSAFER',
+            '-sDEVICE=tiffg4', f'-r{FAX_RES}',
+            f'-dFirstPage={int(start_page)}']
+    if end_page:
+        args.append(f'-dLastPage={int(end_page)}')
+    args += [f'-sOutputFile={out_tiff}', src_pdf]
+    _run(args, timeout=120)
+    if os.path.isfile(out_tiff) and os.path.getsize(out_tiff) > 0:
+        return out_tiff
+    raise ConvertError('PDF 페이지 추출 실패')
+
+
+def parse_page_spec(spec, total):
+    """페이지 지정 문자열 → 정렬된 페이지 번호 리스트 (1-기반, 중복제거).
+
+    예: "2,8" → [2,8]  /  "3-5" → [3,4,5]  /  "1,3-5,8" → [1,3,4,5,8]
+    total 범위를 벗어나는 건 제외. 잘못된 입력은 무시.
+    """
+    if not spec:
+        return []
+    pages = set()
+    for part in str(spec).replace(' ', '').split(','):
+        if not part:
+            continue
+        if '-' in part:
+            try:
+                a, b = part.split('-', 1)
+                a, b = int(a), int(b)
+                for p in range(min(a, b), max(a, b) + 1):
+                    if 1 <= p <= total:
+                        pages.add(p)
+            except ValueError:
+                continue
+        else:
+            try:
+                p = int(part)
+                if 1 <= p <= total:
+                    pages.add(p)
+            except ValueError:
+                continue
+    return sorted(pages)
+
+
+def slice_selected_pages(src, page_list, out_tiff):
+    """지정한 페이지들만 추출해 새 TIFF 생성 (연속 아니어도 됨).
+
+    page_list: 1-기반 페이지 번호 리스트 (예: [2, 8] 또는 [3,4,5]).
+    특정 페이지만 재전송(누락 페이지 대응)용.
+    TIFF/PDF 원본 모두 지원.
+    """
+    import os
+    if not page_list:
+        raise ConvertError('추출할 페이지가 없습니다')
+    low = src.lower()
+
+    if low.endswith('.pdf'):
+        # PDF: gs로 페이지 목록 추출 (-sPageList)
+        gs = _which('gs') or _which('ghostscript')
+        if gs:
+            plist = ','.join(str(p) for p in page_list)
+            _run([gs, '-q', '-dNOPAUSE', '-dBATCH', '-dSAFER',
+                  '-sDEVICE=tiffg4', f'-r{FAX_RES}',
+                  f'-sPageList={plist}',
+                  f'-sOutputFile={out_tiff}', src], timeout=120)
+            if os.path.isfile(out_tiff) and os.path.getsize(out_tiff) > 0:
+                return out_tiff
+        raise ConvertError('PDF 선택 페이지 추출 실패')
+
+    # TIFF: tiffcp (0-기반) 또는 ImageMagick
+    tiffcp = _which('tiffcp')
+    if tiffcp:
+        pages = [f'{src},{p-1}' for p in page_list]  # 0-기반
+        try:
+            _run([tiffcp] + pages + [out_tiff], timeout=60)
+            if os.path.isfile(out_tiff) and os.path.getsize(out_tiff) > 0:
+                return out_tiff
+        except Exception:
+            pass
+    convert = _which('convert')
+    if convert:
+        # convert src[1,7] 처럼 0-기반 인덱스 나열
+        idx = ','.join(str(p-1) for p in page_list)
+        try:
+            _run([convert, f'{src}[{idx}]', '-compress', 'Group4', out_tiff], timeout=60)
+            if os.path.isfile(out_tiff) and os.path.getsize(out_tiff) > 0:
+                return out_tiff
+        except Exception:
+            pass
+    raise ConvertError('선택 페이지 슬라이싱 실패 (tiffcp/convert 필요)')
+
+
 def supported_formats():
     """지원 형식 목록 반환."""
     return {

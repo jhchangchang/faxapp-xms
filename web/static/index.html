@@ -9,156 +9,291 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
 :root{
-  --bg:#fbfcfd;--surface:#ffffff;--surface-2:#f6f8fa;--border:#e8ecf1;--border-strong:#d8dee6;
-  --text:#111826;--text-2:#5b6675;--text-3:#98a2b3;
-  --accent:#4f46e5;--accent-weak:#eef0fe;--accent-hover:#4338ca;
-  --ok:#12805c;--ok-weak:#e7f4ef;--err:#c0362c;--err-weak:#fbecea;--wait:#b26b00;--wait-weak:#fbf1e0;
+  /* ── 밝고 깨끗한 뉴트럴 (약간 따뜻하게) ── */
+  --bg:#f8fafc;--surface:#ffffff;--surface-2:#f6f8fb;--surface-3:#eef2f7;
+  --border:#eaeef3;--border-strong:#dde3ea;
+  --text:#0f172a;--text-2:#475569;--text-3:#94a3b8;
+  /* ── 생기있는 인디고 액센트 ── */
+  --accent:#4f46e5;--accent-2:#6366f1;--accent-weak:#eef2ff;--accent-mid:#e0e7ff;--accent-hover:#4338ca;
+  /* ── 시맨틱 (선명하고 밝게) ── */
+  --ok:#059669;--ok-weak:#ecfdf5;--ok-mid:#d1fae5;
+  --err:#dc2626;--err-weak:#fef2f2;--err-mid:#fee2e2;
+  --wait:#d97706;--wait-weak:#fffbeb;--wait-mid:#fef3c7;
+  --info:#0284c7;--info-weak:#f0f9ff;
   --mono:'SF Mono','JetBrains Mono','Roboto Mono',ui-monospace,monospace;
-  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
-  --r:10px;--r-sm:7px;--r-lg:14px;
-  --sh-sm:0 1px 2px rgba(17,24,38,.05);--sh:0 1px 3px rgba(17,24,38,.08),0 1px 2px rgba(17,24,38,.04);--sh-lg:0 8px 28px rgba(17,24,38,.10);
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+  --r:12px;--r-sm:9px;--r-lg:16px;--r-xs:6px;
+  /* ── 부드럽고 입체적인 그림자 ── */
+  --sh-sm:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.03);
+  --sh:0 2px 4px rgba(15,23,42,.04),0 4px 12px rgba(15,23,42,.06);
+  --sh-md:0 4px 8px rgba(15,23,42,.05),0 8px 24px rgba(15,23,42,.08);
+  --sh-lg:0 12px 24px rgba(15,23,42,.08),0 20px 48px rgba(15,23,42,.12);
+  --sh-accent:0 4px 12px rgba(79,70,229,.24);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.2px}
-button{font-family:inherit;cursor:pointer;border:none;background:none}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-.05px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--text)}
 svg{display:block}
-::selection{background:var(--accent-weak)}
+::selection{background:var(--accent-mid)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:6px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+::-webkit-scrollbar-track{background:transparent}
 .ic{width:18px;height:18px;stroke:currentColor;stroke-width:1.75;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .ic-sm{width:15px;height:15px}
-.auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at 30% 20%,#f0f3f8,#fbfcfd)}
-.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:40px 38px;width:100%;max-width:380px;box-shadow:var(--sh-lg)}
-.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:8px}
-.auth-logo .mark{width:38px;height:38px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center}
-.auth-logo .mark svg{width:20px;height:20px;stroke:#fff;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
-.auth h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
-.auth .sub{color:var(--text-3);font-size:13px;margin-bottom:28px}
-.field{margin-bottom:16px}
-.field label{display:block;font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:7px}
-.inp{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);transition:border-color .15s,box-shadow .15s}
-.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.btn-primary{width:100%;padding:12px;background:var(--accent);color:#fff;border-radius:var(--r-sm);font-size:14px;font-weight:600;transition:background .15s}
-.btn-primary:hover{background:var(--accent-hover)}
-.btn-primary:disabled{opacity:.6;cursor:default}
-.auth-err{background:var(--err-weak);color:var(--err);padding:11px 13px;border-radius:var(--r-sm);font-size:12.5px;font-weight:500;margin-bottom:16px}
+
+/* ══ 로그인 ══ */
+.auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:
+  radial-gradient(1200px 600px at 15% -10%,#eef2ff 0%,transparent 55%),
+  radial-gradient(1000px 500px at 110% 110%,#e0e7ff 0%,transparent 50%),
+  var(--bg)}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:44px 40px;width:100%;max-width:400px;box-shadow:var(--sh-lg)}
+.auth-logo{display:flex;align-items:center;gap:13px;margin-bottom:10px}
+.auth-logo .mark{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent-2),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-accent)}
+.auth-logo .mark svg{width:23px;height:23px;stroke:#fff;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.auth h1{font-size:22px;font-weight:750;letter-spacing:-.5px}
+.auth .sub{color:var(--text-3);font-size:13.5px;margin-bottom:30px}
+.field{margin-bottom:17px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:8px}
+.inp{width:100%;padding:12px 14px;border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);font-size:14px;transition:border-color .16s,box-shadow .16s}
+.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3.5px var(--accent-weak)}
+.btn-primary{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent-2),var(--accent));color:#fff;border-radius:var(--r-sm);font-size:14.5px;font-weight:650;letter-spacing:-.1px;transition:filter .16s,transform .1s,box-shadow .16s;box-shadow:var(--sh-accent)}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-primary:active{transform:translateY(1px)}
+.btn-primary:disabled{opacity:.55;cursor:default}
+.auth-err{background:var(--err-weak);color:var(--err);padding:12px 14px;border-radius:var(--r-sm);font-size:12.5px;font-weight:550;margin-bottom:17px;border:1px solid var(--err-mid)}
+
+/* ══ 레이아웃 ══ */
 .shell{display:flex;min-height:100vh}
-.side{width:224px;background:var(--surface);border-right:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
-.side-top{padding:20px 20px 16px;display:flex;align-items:center;gap:11px}
-.side-top .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
-.side-top .mark svg{width:17px;height:17px;stroke:#fff;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
-.side-top .nm{font-size:15.5px;font-weight:700;letter-spacing:-.3px}
-.nav{padding:8px 12px;flex:1;overflow-y:auto}
-.nav-sec{font-size:11px;color:var(--text-3);font-weight:600;letter-spacing:.4px;padding:14px 10px 6px;text-transform:uppercase}
-.nav-sec:first-child{padding-top:4px}
-.nav-a{display:flex;align-items:center;gap:11px;padding:8.5px 10px;border-radius:var(--r-sm);color:var(--text-2);font-weight:500;font-size:13.5px;cursor:pointer;transition:background .12s,color .12s}
+.side{width:210px;background:var(--surface);border-right:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.side-top{padding:20px 18px 14px;display:flex;align-items:center;gap:12px}
+.side-top .mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent-2),var(--accent));display:flex;align-items:center;justify-content:center;box-shadow:var(--sh-accent)}
+.side-top .mark svg{width:18px;height:18px;stroke:#fff;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.side-top .nm{font-size:16px;font-weight:750;letter-spacing:-.4px}
+.nav{padding:6px 12px;flex:1;overflow-y:auto}
+.nav-sec{font-size:10.5px;color:var(--text-3);font-weight:700;letter-spacing:.6px;padding:15px 10px 6px;text-transform:uppercase}
+.nav-sec:first-child{padding-top:6px}
+.nav-a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:var(--r-sm);color:var(--text-2);font-weight:550;font-size:13.5px;cursor:pointer;transition:background .14s,color .14s;position:relative}
 .nav-a:hover{background:var(--surface-2);color:var(--text)}
-.nav-a.on{background:var(--accent-weak);color:var(--accent);font-weight:600}
+.nav-a.on{background:var(--accent-weak);color:var(--accent);font-weight:650}
+.nav-a.on::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:20px;background:var(--accent);border-radius:0 3px 3px 0}
 .nav-a .lbl{flex:1}
-.nav-a .cnt{font-size:11.5px;font-weight:600;color:var(--text-3);font-family:var(--mono)}
-.nav-a.on .cnt{color:var(--accent)}
+.nav-a .cnt{font-size:11px;font-weight:650;color:#fff;background:var(--accent-2);font-family:var(--mono);padding:1px 7px;border-radius:10px;min-width:20px;text-align:center}
+.nav-a:not(.on) .cnt{background:var(--surface-3);color:var(--text-3)}
 .side-user{padding:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
-.avatar{width:34px;height:34px;border-radius:8px;background:var(--accent-weak);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.avatar{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent-weak),var(--accent-mid));color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:750;font-size:14px;flex-shrink:0}
 .side-user .who{flex:1;min-width:0}
-.side-user .who .n{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side-user .who .n{font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .side-user .who .r{font-size:11.5px;color:var(--text-3)}
-.icon-btn{width:32px;height:32px;border-radius:var(--r-sm);color:var(--text-3);display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s}
+.icon-btn{width:32px;height:32px;border-radius:var(--r-sm);color:var(--text-3);display:flex;align-items:center;justify-content:center;transition:background .13s,color .13s}
 .icon-btn:hover{background:var(--surface-2);color:var(--text)}
 .main{flex:1;display:flex;flex-direction:column;min-width:0}
-.head{height:60px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:var(--surface)}
-.head h2{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.head{height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:rgba(255,255,255,.8);backdrop-filter:saturate(180%) blur(8px);position:sticky;top:0;z-index:20}
+.head h2{font-size:18px;font-weight:750;letter-spacing:-.4px}
 .head .head-sub{font-size:12.5px;color:var(--text-3);margin-top:1px}
-.content{padding:28px;flex:1;overflow-y:auto;max-width:1180px;width:100%}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-sm);margin-bottom:20px;overflow:hidden}
-.card-h{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
-.card-t{font-size:14px;font-weight:650;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
-.card-t .muted{color:var(--text-3);font-weight:500}
-.card-b{padding:18px}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(172px,1fr));gap:14px;margin-bottom:20px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:17px 18px;box-shadow:var(--sh-sm)}
-.stat .lbl{font-size:12px;color:var(--text-2);font-weight:550;margin-bottom:10px;display:flex;align-items:center;gap:7px}
-.stat .lbl .dot{width:7px;height:7px;border-radius:2px;background:var(--accent)}
-.stat .lbl .dot.ok{background:var(--ok)}.stat .lbl .dot.err{background:var(--err)}.stat .lbl .dot.wait{background:var(--wait)}
-.stat .num{font-size:29px;font-weight:700;letter-spacing:-1.2px;line-height:1}
-.stat .meta{font-size:12px;color:var(--text-3);margin-top:8px}
-.tbl{width:100%;border-collapse:collapse;font-size:13px}
-.tbl thead th{text-align:left;padding:10px 16px;font-size:11.5px;color:var(--text-3);font-weight:600;letter-spacing:.2px;border-bottom:1px solid var(--border);white-space:nowrap}
-.tbl tbody td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle}
+.content{padding:22px 28px;flex:1;overflow-y:auto;max-width:1480px;width:100%}
+
+/* ══ 카드 ══ */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh-sm);margin-bottom:16px;overflow:hidden;animation:fadeUp .32s cubic-bezier(.16,1,.3,1)}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap}
+.card-t{font-size:14px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+.card-t .muted{color:var(--text-3);font-weight:500;font-size:12.5px}
+.card-b{padding:14px 16px}
+
+/* ══ 통계 카드 ══ */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:14px;margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh-sm);transition:box-shadow .22s,transform .22s,border-color .22s;position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle at 100% 0%,var(--accent-weak),transparent 70%);opacity:.6;pointer-events:none}
+.stat:hover{box-shadow:var(--sh-md);transform:translateY(-2px);border-color:var(--accent-mid)}
+.stat .lbl{font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:7px;position:relative;z-index:1}
+.stat .lbl .dot{width:8px;height:8px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.stat .lbl .dot.ok{background:var(--ok);box-shadow:0 0 0 3px var(--ok-weak)}
+.stat .lbl .dot.err{background:var(--err);box-shadow:0 0 0 3px var(--err-weak)}
+.stat .lbl .dot.wait{background:var(--wait);box-shadow:0 0 0 3px var(--wait-weak)}
+.stat .num{font-size:27px;font-weight:780;letter-spacing:-1.2px;line-height:1.05;font-variant-numeric:tabular-nums;position:relative;z-index:1}
+.stat .meta{font-size:11.5px;color:var(--text-3);margin-top:5px;position:relative;z-index:1;font-weight:500}
+
+/* ══ 테이블 ══ */
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl thead th{text-align:left;padding:10px 13px;font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:.4px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface-2)}
+.tbl tbody td{padding:10px 13px;border-bottom:1px solid var(--border);vertical-align:middle}
 .tbl tbody tr:last-child td{border-bottom:none}
-.tbl tbody tr{transition:background .1s}
-.tbl tbody tr:hover{background:var(--surface-2)}
+.tbl tbody tr{transition:background .12s}
+.tbl tbody tr:hover{background:var(--accent-weak)}
 .tbl .num{text-align:right}
-.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap}
-.badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* ══ 뱃지 ══ */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:650;white-space:nowrap;letter-spacing:-.1px}
+.badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
 .b-ok{background:var(--ok-weak);color:var(--ok)}
 .b-err{background:var(--err-weak);color:var(--err)}
 .b-wait{background:var(--wait-weak);color:var(--wait)}
-.b-dim{background:var(--surface-2);color:var(--text-3)}
+.b-dim{background:var(--surface-3);color:var(--text-3)}
 .b-send{background:var(--accent-weak);color:var(--accent)}
-.role{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600}
+.role{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:650}
 .role-admin{background:var(--err-weak);color:var(--err)}
 .role-manager{background:var(--wait-weak);color:var(--wait)}
 .role-user{background:var(--accent-weak);color:var(--accent)}
 .dim{color:var(--text-3)}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-2);border-radius:var(--r-sm);font-size:13px;font-weight:550;transition:all .13s;white-space:nowrap}
+
+/* ══ 버튼 ══ */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 15px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text-2);border-radius:var(--r-sm);font-size:13px;font-weight:600;transition:all .14s;white-space:nowrap}
 .btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-weak)}
+.btn:active{transform:translateY(1px)}
 .btn:disabled{opacity:.5;cursor:default}
-.btn:disabled:hover{border-color:var(--border-strong);color:var(--text-2);background:var(--surface)}
-.btn-a{background:var(--accent);color:#fff;border-color:var(--accent)}
-.btn-a:hover{background:var(--accent-hover);color:#fff;border-color:var(--accent-hover)}
-.btn-s{padding:6px 11px;font-size:12.5px}
-.btn-x{padding:5px 10px;font-size:12px}
+.btn:disabled:hover{border-color:var(--border-strong);color:var(--text-2);background:var(--surface);transform:none}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn-a{background:linear-gradient(135deg,var(--accent-2),var(--accent));color:#fff;border-color:transparent;box-shadow:var(--sh-accent)}
+.btn-a:hover{filter:brightness(1.07);color:#fff;background:linear-gradient(135deg,var(--accent-2),var(--accent))}
+.btn-s{padding:7px 12px;font-size:12.5px}
+.btn-x{padding:5px 10px;font-size:12px;border-radius:var(--r-xs)}
 .btn-err:hover{border-color:var(--err);color:var(--err);background:var(--err-weak)}
 .btn-ghost{border-color:transparent;background:transparent}
-.btn-row{display:flex;gap:7px;flex-wrap:wrap}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ══ 세그먼트 (필터탭) ══ */
 .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:3px;gap:2px}
-.seg button{padding:5px 12px;font-size:12.5px;font-weight:550;color:var(--text-2);border-radius:5px;transition:all .12s}
-.seg button.on{background:var(--surface);color:var(--accent);box-shadow:var(--sh-sm);font-weight:600}
-.frm{margin-bottom:15px}
-.frm label{display:block;font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:7px}
-.frm .inp,.frm select,.frm textarea{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);transition:border-color .15s,box-shadow .15s}
-.frm .inp:focus,.frm select:focus,.frm textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
-.frm textarea{resize:vertical;min-height:60px}
-.drop{border:1.5px dashed var(--border-strong);border-radius:var(--r);padding:26px;text-align:center;color:var(--text-3);background:var(--surface-2);cursor:pointer;transition:all .15s;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:8px}
-.drop:hover{border-color:var(--accent);color:var(--accent)}
+.seg button{padding:6px 13px;font-size:12.5px;font-weight:600;color:var(--text-2);border-radius:var(--r-xs);transition:all .14s}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:var(--surface);color:var(--accent);box-shadow:var(--sh-sm);font-weight:700}
+
+/* ══ 폼 ══ */
+.frm{margin-bottom:16px}
+.frm label{display:block;font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:8px}
+.frm .inp,.frm select,.frm textarea{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);font-size:13.5px;transition:border-color .16s,box-shadow .16s}
+.frm .inp:focus,.frm select:focus,.frm textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3.5px var(--accent-weak)}
+.frm textarea{resize:vertical;min-height:64px}
+.drop{border:2px dashed var(--border-strong);border-radius:var(--r);padding:30px;text-align:center;color:var(--text-3);background:var(--surface-2);cursor:pointer;transition:all .16s;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:9px}
+.drop:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-weak)}
 .drop.has{border-color:var(--ok);color:var(--ok);border-style:solid;background:var(--ok-weak)}
 .check{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:550;cursor:pointer;color:var(--text-2)}
 .check input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
-.empty{padding:56px 20px;text-align:center;color:var(--text-3)}
-.empty svg{width:34px;height:34px;stroke:var(--text-3);stroke-width:1.5;fill:none;stroke-linecap:round;stroke-linejoin:round;margin:0 auto 14px;opacity:.6}
-.empty .t{font-size:14px;font-weight:600;color:var(--text-2)}
-.empty .d{font-size:13px;margin-top:5px}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:12px 20px;border-radius:var(--r-sm);font-size:13.5px;font-weight:550;box-shadow:var(--sh-lg);z-index:300;display:flex;align-items:center;gap:9px;animation:toast .25s cubic-bezier(.16,1,.3,1)}
-.toast svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
-.toast.ok{background:var(--ok)}.toast.err{background:var(--err)}
-@keyframes toast{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.chart{display:flex;align-items:flex-end;gap:8px;height:180px;padding:16px 4px 0}
-.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
-.chart-bars{width:100%;display:flex;gap:3px;align-items:flex-end;height:100%;justify-content:center}
-.chart-bar{width:44%;border-radius:3px 3px 0 0;min-height:2px;transition:height .4s cubic-bezier(.16,1,.3,1)}
-.chart-bar.s{background:var(--accent)}
-.chart-bar.r{background:#a5b4fc}
+input[type=checkbox]{accent-color:var(--accent)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3.5px var(--accent-weak)}
+
+/* ══ 빈 화면 ══ */
+.empty{padding:52px 24px;text-align:center;color:var(--text-3)}
+.empty .empty-ic{width:64px;height:64px;margin:0 auto 18px;border-radius:20px;background:linear-gradient(135deg,var(--accent-weak),var(--accent-mid));display:flex;align-items:center;justify-content:center;color:var(--accent);box-shadow:0 8px 20px rgba(79,70,229,.12)}
+.empty .empty-ic svg{width:30px;height:30px}
+.empty .empty-t{font-size:15.5px;font-weight:700;color:var(--text);margin-bottom:7px}
+.empty .empty-d{font-size:13px;color:var(--text-3);line-height:1.55;max-width:360px;margin:0 auto 20px}
+.empty .empty-act{display:inline-flex;gap:8px}
+.empty svg{margin:0 auto}
+.empty .t{font-size:15px;font-weight:700;color:var(--text)}
+.empty .d{font-size:13px;margin-top:6px;color:var(--text-3)}
+
+/* ══ 스켈레톤 ══ */
+@keyframes shimmer{0%{background-position:-500px 0}100%{background-position:500px 0}}
+.skel{background:linear-gradient(90deg,#eef2f7 25%,#f8fafc 50%,#eef2f7 75%);background-size:1000px 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:14px;margin:8px 0}
+.skel-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.skel-row .skel{flex:1;height:16px;margin:0}
+
+/* ══ 애니메이션 ══ */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.page-enter{animation:fadeUp .32s cubic-bezier(.16,1,.3,1)}
+
+/* ══ 토스트 ══ */
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:13px 22px;border-radius:var(--r-sm);font-size:13.5px;font-weight:600;box-shadow:var(--sh-lg);z-index:300;display:flex;align-items:center;gap:10px;animation:toastIn .3s cubic-bezier(.16,1,.3,1)}
+.toast svg{width:17px;height:17px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.toast.ok{background:linear-gradient(135deg,#10b981,var(--ok))}
+.toast.err{background:linear-gradient(135deg,#ef4444,var(--err))}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(14px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ══ 차트 ══ */
+.chart{display:flex;align-items:flex-end;gap:8px;height:190px;padding:18px 4px 0}
+.chart-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:9px;height:100%;justify-content:flex-end}
+.chart-bars{width:100%;display:flex;gap:4px;align-items:flex-end;height:100%;justify-content:center}
+.chart-bar{width:44%;border-radius:5px 5px 0 0;min-height:3px;transition:height .5s cubic-bezier(.16,1,.3,1)}
+.chart-bar.s{background:linear-gradient(180deg,var(--accent-2),var(--accent))}
+.chart-bar.r{background:linear-gradient(180deg,#a5b4fc,#818cf8)}
 .chart-x{font-size:11px;color:var(--text-3);font-family:var(--mono);white-space:nowrap}
-.chart-legend{display:flex;gap:16px;font-size:12px;color:var(--text-2)}
+.chart-legend{display:flex;gap:16px;font-size:12px;color:var(--text-2);font-weight:550}
 .chart-legend span{display:flex;align-items:center;gap:6px}
-.chart-legend i{width:10px;height:10px;border-radius:3px}
-.scrim{position:fixed;inset:0;background:rgba(17,24,38,.45);backdrop-filter:blur(2px);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;animation:fade .15s}
+.chart-legend i{width:11px;height:11px;border-radius:4px}
+
+/* ══ 모달 ══ */
+.scrim{position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;animation:fade .18s}
 @keyframes fade{from{opacity:0}to{opacity:1}}
-.modal{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-lg);width:100%;max-width:720px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
-.modal-h{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--border)}
-.modal-h .t{font-size:14.5px;font-weight:650}
+.modal{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--sh-lg);width:100%;max-width:720px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;animation:modalIn .28s cubic-bezier(.16,1,.3,1)}
+@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-h .t{font-size:15px;font-weight:700;letter-spacing:-.3px}
 .modal-b{padding:20px;overflow-y:auto;background:var(--surface-2)}
 .pv-img{max-width:100%;display:block;margin:0 auto;border:1px solid var(--border);border-radius:var(--r-sm);background:#fff;box-shadow:var(--sh)}
-.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+
+/* ══ 로딩 ══ */
+.spinner{width:20px;height:20px;border:2.5px solid var(--accent-mid);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 .center-load{display:flex;justify-content:center;padding:60px}
-.grid-2{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start}
-.grid-side{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start}
+
+/* ══ 그리드 ══ */
+.grid-2{display:grid;grid-template-columns:1fr 340px;gap:22px;align-items:start}
+.grid-side{display:grid;grid-template-columns:280px 1fr;gap:22px;align-items:start}
 @media(max-width:900px){.grid-2,.grid-side{grid-template-columns:1fr}.side{width:64px}.side-top .nm,.nav-sec,.nav-a .lbl,.nav-a .cnt,.side-user .who,.side-user .icon-btn{display:none}}
 .inline-edit{display:flex;gap:5px;align-items:center}
-.inline-edit input{padding:4px 8px;border:1px solid var(--border-strong);border-radius:5px;font-size:12.5px;width:130px}
-.link{color:var(--accent);cursor:pointer;font-weight:550}
+.inline-edit input{padding:5px 9px;border:1px solid var(--border-strong);border-radius:var(--r-xs);font-size:12.5px;width:130px}
+.link{color:var(--accent);cursor:pointer;font-weight:600}
 .link:hover{text-decoration:underline}
+
+/* ══ 대시보드 체계적 레이아웃 ══ */
+/* 히어로: 핵심 지표를 큰 그라데이션 카드로 */
+.hero{background:linear-gradient(135deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%);border-radius:var(--r-lg);padding:26px 28px;color:#fff;position:relative;overflow:hidden;box-shadow:var(--sh-md);margin-bottom:18px}
+.hero::before{content:'';position:absolute;top:-40%;right:-5%;width:340px;height:340px;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 65%);pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:-60%;left:20%;width:280px;height:280px;background:radial-gradient(circle,rgba(255,255,255,.08),transparent 65%);pointer-events:none}
+.hero-top{display:flex;align-items:flex-start;justify-content:space-between;position:relative;z-index:1;flex-wrap:wrap;gap:16px}
+.hero-title{font-size:14px;font-weight:600;opacity:.9;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.hero-metrics{display:flex;gap:36px;flex-wrap:wrap}
+.hero-metric .v{font-size:34px;font-weight:800;letter-spacing:-1.5px;line-height:1;font-variant-numeric:tabular-nums}
+.hero-metric .l{font-size:12px;opacity:.85;margin-top:6px;font-weight:500}
+.hero-metric .d{font-size:11.5px;opacity:.9;margin-top:3px}
+.hero-status{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);padding:8px 14px;border-radius:20px;font-size:12.5px;font-weight:600;backdrop-filter:blur(4px)}
+.hero-status .pip{width:8px;height:8px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 3px rgba(74,222,128,.3)}
+.hero-status.down .pip{background:#f87171;box-shadow:0 0 0 3px rgba(248,113,113,.3)}
+
+/* 대시보드 메인 그리드 (좌 넓게 + 우 사이드) */
+.dash-grid{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start;margin-bottom:18px}
+@media(max-width:1100px){.dash-grid{grid-template-columns:1fr}}
+
+/* 미니 지표 카드 (아이콘 + 숫자) */
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--sh-sm);display:flex;align-items:center;gap:14px;transition:box-shadow .2s,transform .2s}
+.metric-card:hover{box-shadow:var(--sh-md);transform:translateY(-2px)}
+.metric-ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.metric-ic svg{width:22px;height:22px;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.metric-ic.i-blue{background:var(--accent-weak);color:var(--accent)}
+.metric-ic.i-green{background:var(--ok-weak);color:var(--ok)}
+.metric-ic.i-amber{background:var(--wait-weak);color:var(--wait)}
+.metric-ic.i-red{background:var(--err-weak);color:var(--err)}
+.metric-info .mv{font-size:23px;font-weight:780;letter-spacing:-1px;line-height:1;font-variant-numeric:tabular-nums}
+.metric-info .ml{font-size:12px;color:var(--text-3);margin-top:4px;font-weight:500}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+
+/* 액션 리스트 (조치 필요 - 우측 사이드) */
+.action-list{display:flex;flex-direction:column;gap:8px}
+.action-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:all .15s;background:var(--surface)}
+.action-row:hover{border-color:var(--accent);background:var(--accent-weak);transform:translateX(2px)}
+.action-row .a-badge{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0}
+.action-row .a-info{flex:1;min-width:0}
+.action-row .a-t{font-size:13px;font-weight:650;color:var(--text)}
+.action-row .a-d{font-size:11.5px;color:var(--text-3);margin-top:1px}
+.action-row .a-arrow{color:var(--text-3);flex-shrink:0}
+.action-row:hover .a-arrow{color:var(--accent)}
+
+/* 리스트 아이템 (최근 활동) */
+.activity{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.activity:last-child{border-bottom:none}
+.activity .act-ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.activity .act-main{flex:1;min-width:0}
+.activity .act-t{font-size:13px;font-weight:600}
+.activity .act-s{font-size:11.5px;color:var(--text-3);margin-top:1px}
+.activity .act-time{font-size:11.5px;color:var(--text-3);font-family:var(--mono)}
+
+/* 섹션 헤딩 */
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sec-head .sh-t{font-size:15px;font-weight:750;letter-spacing:-.3px}
+.sec-head .sh-more{font-size:12.5px;color:var(--accent);font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
@@ -201,7 +336,14 @@ async function api(path,opts={}){
 const J=o=>JSON.stringify(o);
 const fmt=ts=>{if(!ts)return'-';const s=String(ts);return s.slice(5,16).replace('T',' ');};
 function Loading(){return <div className="center-load"><span className="spinner"/></div>;}
-function Empty({icon,t,d}){return <div className="empty">{icon}<div className="t">{t}</div>{d&&<div className="d">{d}</div>}</div>;}
+// 스켈레톤 테이블 (로딩 중 - 빈 화면 대신 부드럽게)
+function SkeletonTable({rows}){
+  return <div style={{padding:'4px 0'}}>{Array.from({length:rows||5}).map((_,i)=>
+    <div className="skel-row" key={i}>
+      <span className="skel" style={{maxWidth:90}}/><span className="skel"/><span className="skel" style={{maxWidth:120}}/><span className="skel" style={{maxWidth:60}}/>
+    </div>)}</div>;
+}
+function Empty({icon,t,d,action}){return <div className="empty"><div className="empty-ic">{icon||I.inbox}</div><div className="empty-t">{t}</div>{d&&<div className="empty-d">{d}</div>}{action&&<div className="empty-act">{action}</div>}</div>;}
 function Login({onLogin}){
   const [u,setU]=useState(''),[p,setP]=useState(''),[err,setErr]=useState(''),[busy,setBusy]=useState(false);
   const submit=async()=>{setErr('');setBusy(true);try{const r=await api('/api/auth/login',{method:'POST',body:J({username:u,password:p})});onLogin(r.user);}catch(e){setErr(e.message);}finally{setBusy(false);}};
@@ -217,88 +359,96 @@ function Login({onLogin}){
 function Dashboard({setPage}){
   const [d,setD]=useState(null),[daily,setDaily]=useState(null);
   const load=()=>{api('/api/stats/dashboard').then(setD).catch(()=>{});api('/api/stats/daily?days=14').then(setDaily).catch(()=>setDaily({sent:[],received:[]}));};
-  useEffect(()=>{load();const t=setInterval(load,15000);return()=>clearInterval(t);},[]);  // 15초마다 자동 갱신
+  useEffect(()=>{load();const t=setInterval(load,15000);return()=>clearInterval(t);},[]);
   if(!d)return <Loading/>;
-  const eng=d.engine||{};
-  const act=d.action_needed||{};
-  const today=d.today||{};
-  const proc=d.processing||{};
+  const eng=d.engine||{},act=d.action_needed||{},today=d.today||{},proc=d.processing||{};
   const diff=today.total-today.yesterday;
-  return <div>
-    {/* ── 실시간 상태 바 ── */}
-    <div className="card" style={{marginBottom:16}}>
-      <div className="card-b" style={{display:'flex',alignItems:'center',gap:24,flexWrap:'wrap',padding:'16px 20px'}}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <span style={{width:12,height:12,borderRadius:'50%',background:eng.ok?'var(--ok)':'var(--err)',boxShadow:eng.ok?'0 0 0 4px rgba(16,168,110,.15)':'0 0 0 4px rgba(229,72,77,.15)'}}/>
-          <div><div style={{fontSize:13,fontWeight:650}}>팩스 엔진 {eng.ok?'정상':'응답 없음'}</div>
-            <div className="dim" style={{fontSize:11}}>{eng.engine||'unknown'} {eng.detail?'· '+eng.detail:''}</div></div>
+  const actions=[];
+  if(act.stuck>0)actions.push({n:act.stuck,t:'멈춘 발송',d:'10분 이상 대기 · 엔진 확인',c:'i-red',bg:'var(--err-weak)',cl:'var(--err)',go:'history'});
+  if(act.failed_7d>0)actions.push({n:act.failed_7d,t:'발송 실패',d:'최근 7일 · 재전송 검토',c:'i-red',bg:'var(--err-weak)',cl:'var(--err)',go:'history'});
+  if(act.unread>0)actions.push({n:act.unread,t:'안 읽은 수신',d:'수신함 확인 필요',c:'i-blue',bg:'var(--accent-weak)',cl:'var(--accent)',go:'inbox'});
+  if(act.errors>0)actions.push({n:act.errors,t:'미해결 오류',d:'오류 로그 확인',c:'i-amber',bg:'var(--wait-weak)',cl:'var(--wait)',go:'errlog'});
+  return <div className="page-enter">
+    {/* 히어로 - 핵심 지표 */}
+    <div className="hero">
+      <div className="hero-top">
+        <div>
+          <div className="hero-title">오늘의 팩스 현황</div>
+          <div className="hero-metrics">
+            <div className="hero-metric"><div className="v">{today.total||0}</div><div className="l">오늘 발송</div><div className="d">{diff>=0?'▲':'▼'} 어제 대비 {Math.abs(diff||0)}건</div></div>
+            <div className="hero-metric"><div className="v">{today.rate||0}%</div><div className="l">성공률</div><div className="d">성공 {today.ok||0} · 실패 {today.fail||0}</div></div>
+            <div className="hero-metric"><div className="v">{proc.active||0}</div><div className="l">처리 중</div><div className="d">재시도 대기 {proc.retry_wait||0}</div></div>
+          </div>
         </div>
-        <div style={{height:32,width:1,background:'var(--border)'}}/>
-        <div><div className="dim" style={{fontSize:11}}>처리 중</div><div style={{fontSize:18,fontWeight:700}}>{proc.active}<span className="dim" style={{fontSize:12,fontWeight:400}}> 건</span></div></div>
-        <div><div className="dim" style={{fontSize:11}}>재시도 대기</div><div style={{fontSize:18,fontWeight:700}}>{proc.retry_wait}<span className="dim" style={{fontSize:12,fontWeight:400}}> 건</span></div></div>
-        <div style={{marginLeft:'auto'}}><button className="btn btn-s" onClick={load}>{I.refresh}새로고침</button></div>
+        <div className={"hero-status"+(eng.ok?'':' down')}><span className="pip"/>팩스 엔진 {eng.ok?'정상 가동':'응답 없음'}</div>
       </div>
     </div>
 
-    {/* ── 조치 필요 (빨간 배지) ── */}
-    {(act.failed_7d>0||act.stuck>0||act.unread>0||act.errors>0)&&
-    <div className="card" style={{marginBottom:16,borderColor:'var(--err)'}}>
-      <div className="card-h"><div className="card-t" style={{color:'var(--err)'}}>⚠ 조치가 필요합니다</div></div>
-      <div className="card-b" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}>
-        {act.stuck>0&&<div className="action-item" onClick={()=>setPage('history')} style={{cursor:'pointer',padding:14,border:'1px solid var(--err)',borderRadius:8,background:'var(--err-bg,#fef2f2)'}}>
-          <div style={{fontSize:22,fontWeight:750,color:'var(--err)'}}>{act.stuck}</div>
-          <div style={{fontSize:12.5,fontWeight:600}}>멈춘 발송 (10분+)</div>
-          <div className="dim" style={{fontSize:11}}>엔진 확인 필요 →</div></div>}
-        {act.failed_7d>0&&<div className="action-item" onClick={()=>setPage('history')} style={{cursor:'pointer',padding:14,border:'1px solid var(--border)',borderRadius:8}}>
-          <div style={{fontSize:22,fontWeight:750,color:'var(--err)'}}>{act.failed_7d}</div>
-          <div style={{fontSize:12.5,fontWeight:600}}>발송 실패 (7일)</div>
-          <div className="dim" style={{fontSize:11}}>재전송 검토 →</div></div>}
-        {act.unread>0&&<div className="action-item" onClick={()=>setPage('inbox')} style={{cursor:'pointer',padding:14,border:'1px solid var(--border)',borderRadius:8}}>
-          <div style={{fontSize:22,fontWeight:750,color:'var(--accent)'}}>{act.unread}</div>
-          <div style={{fontSize:12.5,fontWeight:600}}>안 읽은 수신</div>
-          <div className="dim" style={{fontSize:11}}>수신함 확인 →</div></div>}
-        {act.errors>0&&<div className="action-item" onClick={()=>setPage('errlog')} style={{cursor:'pointer',padding:14,border:'1px solid var(--border)',borderRadius:8}}>
-          <div style={{fontSize:22,fontWeight:750,color:'var(--warn,#e8930c)'}}>{act.errors}</div>
-          <div style={{fontSize:12.5,fontWeight:600}}>미해결 오류</div>
-          <div className="dim" style={{fontSize:11}}>오류 로그 →</div></div>}
+    {/* 메인 그리드: 좌(차트) + 우(조치필요/빠른작업) */}
+    <div className="dash-grid">
+      {/* 좌측 */}
+      <div>
+        {/* 미니 지표 4개 */}
+        <div className="metric-grid">
+          <div className="metric-card"><div className="metric-ic i-blue">{I.send}</div><div className="metric-info"><div className="mv">{d.sent?.total??today.total??0}</div><div className="ml">누적 발송</div></div></div>
+          <div className="metric-card"><div className="metric-ic i-green">{I.check}</div><div className="metric-info"><div className="mv">{today.rate||0}%</div><div className="ml">성공률</div></div></div>
+          <div className="metric-card"><div className="metric-ic i-amber">{I.clip}</div><div className="metric-info"><div className="mv">{proc.active||0}</div><div className="ml">발송 대기</div></div></div>
+          <div className="metric-card"><div className="metric-ic i-red">{I.inbox}</div><div className="metric-info"><div className="mv">{act.unread||0}</div><div className="ml">안읽은 수신</div></div></div>
+        </div>
+        {/* 추이 차트 */}
+        <div className="card">
+          <div className="card-h"><div className="card-t">최근 2주 송수신 추이</div>
+            <div className="chart-legend"><span><i style={{background:'var(--accent)'}}/>발송</span><span><i style={{background:'#a5b4fc'}}/>수신</span></div></div>
+          <div className="card-b"><DailyChart daily={daily}/></div>
+        </div>
+        {/* 실패 원인 */}
+        <div className="card">
+          <div className="card-h"><div className="card-t">실패 원인 <span className="muted">최근 7일</span></div></div>
+          <div className="card-b">
+            {(d.fail_reasons&&d.fail_reasons.length)?
+              <div style={{display:'flex',flexDirection:'column',gap:11}}>
+                {d.fail_reasons.map((f,i)=>{const max=d.fail_reasons[0].count;return (
+                  <div key={i}>
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,marginBottom:5}}>
+                      <span style={{fontWeight:600}}>{FAULT_LABEL[f.code]||f.code}</span><span className="mono dim">{f.count}건</span></div>
+                    <div style={{height:8,background:'var(--surface-3)',borderRadius:5,overflow:'hidden'}}>
+                      <div style={{height:'100%',width:(f.count/max*100)+'%',background:'linear-gradient(90deg,#f87171,var(--err))',borderRadius:5}}/></div>
+                  </div>);})}
+              </div>
+              :<div className="empty" style={{padding:'30px 0'}}><div className="empty-ic" style={{width:48,height:48,background:'var(--ok-weak)',color:'var(--ok)'}}>{I.check}</div><div className="empty-t" style={{fontSize:14}}>최근 실패 없음</div></div>}
+          </div>
+        </div>
       </div>
-    </div>}
 
-    {/* ── 오늘 실적 ── */}
-    <div className="stats-grid">
-      <div className="stat"><div className="lbl"><span className="dot"/>오늘 발송</div><div className="num">{today.total}</div>
-        <div className="meta">{diff>=0?'▲':'▼'} 어제 대비 {Math.abs(diff)}건</div></div>
-      <div className="stat"><div className="lbl"><span className="dot ok"/>오늘 성공률</div><div className="num">{today.rate}%</div>
-        <div className="meta">성공 {today.ok} / 실패 {today.fail}</div></div>
-      <div className="stat"><div className="lbl"><span className="dot wait"/>처리 중</div><div className="num">{proc.active}</div>
-        <div className="meta">발송 대기열</div></div>
-      <div className="stat"><div className="lbl"><span className="dot err"/>안읽은 수신</div><div className="num">{act.unread}</div>
-        <div className="meta">확인 필요</div></div>
-    </div>
-
-    {/* ── 추이 + 실패원인 ── */}
-    <div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:16}}>
-      <div className="card"><div className="card-h"><div className="card-t">최근 2주 송수신 추이</div>
-        <div className="chart-legend"><span><i style={{background:'var(--accent)'}}/>발송</span><span><i style={{background:'#a5b4fc'}}/>수신</span></div></div>
-        <div className="card-b"><DailyChart daily={daily}/></div></div>
-      <div className="card"><div className="card-h"><div className="card-t">실패 원인 (7일)</div></div>
-        <div className="card-b">
-          {(d.fail_reasons&&d.fail_reasons.length)?
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {d.fail_reasons.map((f,i)=>{const max=d.fail_reasons[0].count;return (
-                <div key={i}>
-                  <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,marginBottom:4}}>
-                    <span style={{fontWeight:600}}>{FAULT_LABEL[f.code]||f.code}</span><span className="mono dim">{f.count}건</span></div>
-                  <div style={{height:7,background:'var(--surface-2)',borderRadius:4,overflow:'hidden'}}>
-                    <div style={{height:'100%',width:(f.count/max*100)+'%',background:'var(--err)',borderRadius:4}}/></div>
-                </div>);})}
-            </div>
-            :<div className="dim" style={{textAlign:'center',padding:'30px 0',fontSize:13}}>최근 실패 없음 ✓</div>}
-        </div></div>
+      {/* 우측 사이드 */}
+      <div>
+        {/* 조치 필요 */}
+        <div className="card" style={{marginBottom:16}}>
+          <div className="card-h"><div className="card-t" style={actions.length?{color:'var(--err)'}:{}}>{actions.length?'⚠ 조치 필요':'✓ 정상'}</div></div>
+          <div className="card-b">
+            {actions.length?<div className="action-list">
+              {actions.map((a,i)=><div className="action-row" key={i} onClick={()=>setPage(a.go)}>
+                <div className="a-badge" style={{background:a.bg,color:a.cl}}>{a.n}</div>
+                <div className="a-info"><div className="a-t">{a.t}</div><div className="a-d">{a.d}</div></div>
+                <span className="a-arrow">{I.chev}</span>
+              </div>)}
+            </div>:<div style={{textAlign:'center',padding:'20px 0',color:'var(--text-3)',fontSize:13}}>처리할 항목이 없습니다</div>}
+          </div>
+        </div>
+        {/* 빠른 작업 */}
+        <div className="card">
+          <div className="card-h"><div className="card-t">빠른 작업</div></div>
+          <div className="card-b" style={{display:'flex',flexDirection:'column',gap:8}}>
+            <button className="btn btn-a" style={{justifyContent:'flex-start',padding:'11px 14px'}} onClick={()=>setPage('send')}>{I.send}팩스 보내기</button>
+            <button className="btn" style={{justifyContent:'flex-start',padding:'11px 14px'}} onClick={()=>setPage('inbox')}>{I.inbox}수신함 열기</button>
+            <button className="btn" style={{justifyContent:'flex-start',padding:'11px 14px'}} onClick={()=>setPage('history')}>{I.clip}발송 이력</button>
+            <button className="btn" style={{justifyContent:'flex-start',padding:'11px 14px'}} onClick={()=>setPage('contacts')}>{I.book}주소록</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>;
 }
-// 실패 코드 → 한글 라벨
 const FAULT_LABEL={INVALID_NUMBER:'번호 오류',BUSY:'통화중',NO_ANSWER:'무응답',
   TRAINING_FAILED:'신호 협상 실패',REMOTE_INCOMPATIBLE:'상대 장비 비호환',
   BAD_TIFF:'문서 오류',CONVERSION:'변환 실패',FAX_SERVER:'엔진 오류',
@@ -396,11 +546,21 @@ const ST={sent:['b-ok','완료'],failed:['b-err','실패'],queued:['b-wait','대
 function SendHistory({toast}){
   const [jobs,setJobs]=useState(null),[pv,setPv]=useState(null),[filter,setFilter]=useState(''),[stats,setStats]=useState({}),[busy,setBusy]=useState(false);
   const [sel,setSel]=useState(new Set());
+  const [pageResend,setPageResend]=useState(null);  // {job, spec}
   const load=()=>{api('/api/fax/jobs-filtered'+(filter?'?status='+filter:'')).then(setJobs).catch(()=>setJobs([]));api('/api/fax/jobs/stats-quick').then(setStats).catch(()=>{});setSel(new Set());};
   useEffect(()=>{load();},[filter]);
   const act=async(fn,msg)=>{try{const r=await fn();toast(r.message||msg,'ok');load();}catch(e){toast(e.message,'err');}};
   const sync=async()=>{setBusy(true);await act(()=>api('/api/fax/jobs/sync',{method:'POST'}),'동기화 완료');setBusy(false);};
   const cancelAll=()=>{act(()=>api('/api/fax/jobs/cancel-pending',{method:'POST'}),'대기 건 취소 완료');};
+  // 페이지 재전송 (누락/불량 페이지만)
+  const doPageResend=async()=>{
+    if(!pageResend||!pageResend.spec.trim()){toast('페이지를 입력하세요 (예: 2,8)','err');return;}
+    try{
+      const r=await api('/api/fax/jobs/'+pageResend.job.id+'/resend-pages',{method:'POST',body:J({pages:pageResend.spec.trim()})});
+      toast(r.message||'페이지 재전송 시작','ok');
+      setPageResend(null);load();
+    }catch(e){toast(e.message,'err');}
+  };
   // 선택 토글 (함수형 업데이트로 최신 상태 보장)
   const toggle=(id)=>{setSel(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});};
   const toggleAll=()=>{setSel(prev=>prev.size===(jobs||[]).length?new Set():new Set((jobs||[]).map(j=>j.id)));};
@@ -445,9 +605,31 @@ function SendHistory({toast}){
           <button className="btn btn-x" onClick={()=>setPv({url:API+'/api/preview/job/'+j.id,title:'발송 #'+j.id})}>{I.eye}</button>
           {(j.status==='queued'||j.status==='pending')&&<button className="btn btn-x btn-err" onClick={()=>act(()=>api('/api/fax/jobs/'+j.id+'/cancel',{method:'POST'}),'취소됨')}>취소</button>}
           {(j.status==='failed'||j.status==='cancelled')&&<button className="btn btn-x" onClick={()=>act(()=>api('/api/fax/jobs/'+j.id+'/resend',{method:'POST'}),'재전송됨')}>재전송</button>}
-        </div></td></tr>;})}</tbody></table>:<Empty icon={I.send} t="발송 이력이 없습니다" d="팩스를 보내면 여기에 기록됩니다"/>}
+          {(j.status==='sent'||j.status==='failed')&&(j.pages||0)>1&&<button className="btn btn-x" onClick={()=>setPageResend({job:j,spec:''})}>페이지 재전송</button>}
+        </div></td></tr>;})}</tbody></table>:<Empty icon={I.send} t="발송 이력이 없습니다" d="팩스를 보내면 여기에 기록됩니다. 발송 상태와 결과를 실시간으로 확인할 수 있습니다."/>}
     </div>
     {pv&&<PreviewModal {...pv} onClose={()=>setPv(null)}/>}
+    {pageResend&&<div className="modal-bg" onClick={()=>setPageResend(null)}>
+      <div className="modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-h"><div className="card-t">페이지 재전송</div><button className="btn btn-x" onClick={()=>setPageResend(null)}>{I.x}</button></div>
+        <div style={{padding:'16px 18px'}}>
+          <div className="dim" style={{fontSize:12.5,marginBottom:10}}>수신처: <b>{pageResend.job.to_number}</b> · 전체 {pageResend.job.pages}페이지</div>
+          <div style={{fontSize:12.5,fontWeight:600,marginBottom:6}}>보낼 페이지 번호</div>
+          <input autoFocus placeholder="예: 2,8  또는  3-5  또는  1,3-5,8"
+            value={pageResend.spec} onChange={e=>setPageResend({...pageResend,spec:e.target.value})}
+            onKeyDown={e=>{if(e.key==='Enter')doPageResend();}}
+            style={{width:'100%',padding:'9px 12px',fontSize:14,border:'1px solid var(--line)',borderRadius:8,boxSizing:'border-box'}}/>
+          <div className="dim" style={{fontSize:11,marginTop:8,lineHeight:1.6}}>
+            · 여러 페이지: <span className="mono">2,8</span> / 범위: <span className="mono">3-5</span> / 혼합: <span className="mono">1,3-5,8</span><br/>
+            누락되거나 불량한 페이지만 골라 다시 보낼 수 있습니다.
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}}>
+            <button className="btn btn-s" onClick={()=>setPageResend(null)}>취소</button>
+            <button className="btn btn-s btn-err" onClick={doPageResend}>재전송</button>
+          </div>
+        </div>
+      </div>
+    </div>}
   </div>;
 }
 function Inbox({toast,user}){
@@ -503,7 +685,7 @@ function Contacts({toast}){
   const addG=async()=>{if(!gname)return toast('그룹명을 입력하세요','err');try{await api('/api/contacts/groups',{method:'POST',body:J({name:gname})});toast('그룹 생성됨','ok');setGname('');loadG();}catch(e){toast(e.message,'err');}};
   const openG=async g=>{setGsel(g);const ms=await api('/api/contacts/groups/'+g.id+'/members').catch(()=>[]);setGmem(ms.map(m=>m.id));};
   const saveG=async()=>{try{await api('/api/contacts/groups/'+gsel.id+'/members',{method:'POST',body:J({contact_ids:gmem})});toast('멤버 저장됨','ok');loadG();}catch(e){toast(e.message,'err');}};
-  const delG=async id=>{if(!confirm('그룹을 삭제할까요?'))return;try{await api('/api/contacts/groups/'+id,{method:'DELETE'});setGsel(null);loadG();}catch(e){toast(e.message,'err');}};
+  const delG=async id=>{try{await api('/api/contacts/groups/'+id,{method:'DELETE'});setGsel(null);loadG();toast('그룹 삭제됨','ok');}catch(e){toast(e.message,'err');}};
   const [importOpen,setImportOpen]=useState(false);
   if(!list)return <Loading/>;
   return <div>
@@ -514,7 +696,7 @@ function Contacts({toast}){
         {list.length?<table className="tbl"><thead><tr><th>이름</th><th>번호</th><th>회사</th><th></th></tr></thead>
         <tbody>{list.map(c=><tr key={c.id}><td style={{fontWeight:600}}>{c.name}</td><td className="mono">{c.fax_number}</td><td className="dim">{c.company||'-'}</td>
           <td><button className="btn btn-x btn-ghost" onClick={()=>del(c.id)}>{I.trash}</button></td></tr>)}</tbody></table>
-        :<Empty icon={I.book} t="연락처가 없습니다" d="자주 보내는 번호를 등록하세요"/>}</div>
+        :<Empty icon={I.book} t="연락처가 없습니다" d="자주 보내는 번호를 등록하면 발송 시 빠르게 선택할 수 있습니다."/>}</div>
       <div className="card"><div className="card-h"><div className="card-t">연락처 추가</div></div><div className="card-b">
         <div className="frm"><label>이름</label><input className="inp" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></div>
         <div className="frm"><label>팩스번호</label><input className="inp" value={form.fax_number} onChange={e=>setForm({...form,fax_number:e.target.value})}/></div>
@@ -592,7 +774,7 @@ function UserAdmin({toast}){
   const load=()=>{api('/api/users').then(setUsers).catch(()=>setUsers([]));api('/api/departments').then(setDepts).catch(()=>{});};
   useEffect(()=>{load();},[]);
   const add=async()=>{if(!f.username||!f.password||!f.display_name)return toast('아이디·비밀번호·이름은 필수입니다','err');try{const b={...f};if(!b.dept_id)delete b.dept_id;else b.dept_id=+b.dept_id;await api('/api/users',{method:'POST',body:J(b)});toast('사용자 추가됨','ok');setF({username:'',password:'',display_name:'',role:'user',dept_id:'',fax_number:''});setShow(false);load();}catch(e){toast(e.message,'err');}};
-  const del=async id=>{if(!confirm('삭제할까요?'))return;try{await api('/api/users/'+id,{method:'DELETE'});load();}catch(e){toast(e.message,'err');}};
+  const del=async id=>{try{await api('/api/users/'+id,{method:'DELETE'});load();toast('삭제됨','ok');}catch(e){toast(e.message,'err');}};
   const RN={admin:'관리자',manager:'매니저',user:'사용자'};
   if(!users)return <Loading/>;
   return <div className="card">
@@ -618,7 +800,7 @@ function DeptAdmin({toast}){
   const load=()=>api('/api/departments').then(setDepts).catch(()=>setDepts([]));
   useEffect(()=>{load();},[]);
   const add=async()=>{if(!f.name)return toast('부서명을 입력하세요','err');try{await api('/api/departments',{method:'POST',body:J(f)});toast('부서 추가됨','ok');setF({name:'',fax_number:''});load();}catch(e){toast(e.message,'err');}};
-  const del=async id=>{if(!confirm('삭제할까요?'))return;try{await api('/api/departments/'+id,{method:'DELETE'});load();}catch(e){toast(e.message,'err');}};
+  const del=async id=>{try{await api('/api/departments/'+id,{method:'DELETE'});load();toast('삭제됨','ok');}catch(e){toast(e.message,'err');}};
   if(!depts)return <Loading/>;
   return <div className="grid-2">
     <div className="card"><div className="card-h"><div className="card-t">부서 <span className="muted">· {depts.length}</span></div></div>
@@ -803,7 +985,7 @@ function Scheduled({toast}){
   const [list,setList]=useState(null);
   const load=()=>api('/api/fax/scheduled').then(setList).catch(e=>toast(e.message,'err'));
   useEffect(()=>{load();},[]);
-  const cancel=async(id)=>{if(!confirm('예약을 취소할까요?'))return;
+  const cancel=async(id)=>{
     try{await api('/api/fax/scheduled/'+id+'/cancel',{method:'POST'});toast('예약 취소됨','ok');load();}catch(e){toast(e.message,'err');}};
   const fmt=s=>{if(!s)return'-';const d=new Date(s);return d.toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});};
   return <div className="card">
@@ -827,7 +1009,7 @@ function ApiKeys({toast}){
   useEffect(()=>{load();},[]);
   const create=async()=>{if(!name.trim())return toast('키 용도를 입력하세요','err');setBusy(true);
     try{const r=await api('/api/v1/keys',{method:'POST',body:J({name:name})});setNewKey(r);setName('');setErr(null);load();}catch(e){toast(e.message,'err');setErr(e.message);}finally{setBusy(false);}};
-  const revoke=async(id)=>{if(!confirm('이 키를 폐기할까요? 해당 키로는 더 이상 발송할 수 없습니다.'))return;
+  const revoke=async(id)=>{
     try{await api('/api/v1/keys/'+id+'/revoke',{method:'POST'});toast('키 폐기됨','ok');load();}catch(e){toast(e.message,'err');}};
   const copyKey=(k)=>{navigator.clipboard&&navigator.clipboard.writeText(k);toast('키가 복사되었습니다','ok');};
   const fmt=s=>s?new Date(s).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'-';
@@ -896,12 +1078,17 @@ function NotifyConfig({toast}){
 
 function ErrorLog({toast}){
   const [sum,setSum]=useState(null),[list,setList]=useState(null),[cat,setCat]=useState('');
+  const [sel,setSel]=useState(new Set());
   const load=()=>{api('/api/errors/summary?days=7').then(setSum).catch(()=>setSum({total:0,unresolved:0,by_category:[],by_code:[]}));
-    api('/api/errors'+(cat?'?category='+cat:'')).then(setList).catch(()=>setList([]));};
+    api('/api/errors'+(cat?'?category='+cat:'')).then(setList).catch(()=>setList([]));setSel(new Set());};
   useEffect(()=>{load();},[cat]);
   const resolve=async id=>{try{await api('/api/errors/'+id+'/resolve',{method:'POST'});load();}catch(e){toast(e.message,'err');}};
-  const resolveAll=async()=>{if(!confirm('모든 오류를 처리됨으로 표시할까요?'))return;try{await api('/api/errors/resolve-all',{method:'POST'});toast('처리 완료','ok');load();}catch(e){toast(e.message,'err');}};
-  const clearAll=async()=>{if(!confirm('오류/알람 로그를 전체 삭제할까요? (되돌릴 수 없습니다)'))return;try{const r=await api('/api/errors/clear-all?confirm=true',{method:'DELETE'});toast(r.message||'전체 삭제됨','ok');load();}catch(e){toast(e.message,'err');}};
+  const resolveAll=async()=>{try{await api('/api/errors/resolve-all',{method:'POST'});toast('전체 처리 완료','ok');load();}catch(e){toast(e.message,'err');}};
+  const clearAll=async()=>{try{const r=await api('/api/errors/clear-all?confirm=true',{method:'DELETE'});toast(r.message||'전체 삭제됨','ok');load();}catch(e){toast(e.message,'err');}};
+  const delOne=async id=>{try{await api('/api/errors/'+id,{method:'DELETE'});load();}catch(e){toast(e.message,'err');}};
+  const toggle=id=>setSel(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const toggleAll=()=>setSel(prev=>prev.size===(list||[]).length?new Set():new Set((list||[]).map(e=>e.id)));
+  const bulkDel=async()=>{const ids=[...sel];if(!ids.length){toast('선택된 항목 없음','err');return;}try{const r=await api('/api/errors/bulk-delete',{method:'POST',body:J({ids})});toast(r.message||'삭제 완료','ok');setSel(new Set());load();}catch(e){toast(e.message,'err');}};
   if(!sum||!list)return <Loading/>;
   const CATS=[['','전체'],['user','사용자'],['retryable','일시적'],['permanent','영구'],['system','시스템']];
   return <div>
@@ -917,14 +1104,16 @@ function ErrorLog({toast}){
         <div className="v">{c.cnt}</div></div>;})}</div></div></div>}
     <div className="card">
       <div className="card-h"><div className="seg">{CATS.map(([v,l])=><button key={v} className={cat===v?'on':''} onClick={()=>setCat(v)}>{l}</button>)}</div>
+        {sel.size>0&&<button className="btn btn-s" onClick={bulkDel} style={{color:'#e0483d'}}>선택 삭제 ({sel.size})</button>}
         {sum.unresolved>0&&<button className="btn btn-s" onClick={resolveAll}>{I.check}전체 처리</button>}
         {sum.total>0&&<button className="btn btn-s" onClick={clearAll} style={{color:'#e0483d'}}>전체 삭제</button>}</div>
-      {list.length?<table className="tbl"><thead><tr><th>시각</th><th>코드</th><th>성격</th><th>내용</th><th>사용자</th><th></th></tr></thead>
+      {list.length?<table className="tbl"><thead><tr><th style={{width:32}}><input type="checkbox" checked={sel.size>0&&sel.size===list.length} onChange={toggleAll}/></th><th>시각</th><th>코드</th><th>성격</th><th>내용</th><th>사용자</th><th></th></tr></thead>
       <tbody>{list.map(e=>{const[cc,cl]=ECAT[e.category]||['b-dim',e.category];return <tr key={e.id} style={{opacity:e.resolved?.5:1}}>
+        <td><input type="checkbox" checked={sel.has(e.id)} onChange={()=>toggle(e.id)}/></td>
         <td className="mono dim">{fmt(e.created_at)}</td><td className="mono" style={{fontWeight:600}}>{e.code}</td>
         <td><span className={'badge '+cc}>{cl}</span></td><td className="dim" style={{maxWidth:320,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={e.detail}>{e.detail}</td>
         <td className="dim">{e.username||'-'}</td>
-        <td>{!e.resolved&&<button className="btn btn-x" onClick={()=>resolve(e.id)}>처리</button>}</td>
+        <td>{!e.resolved&&<button className="btn btn-x" onClick={()=>resolve(e.id)}>처리</button>} <button className="btn btn-x" onClick={()=>delOne(e.id)} style={{color:'#e0483d'}}>삭제</button></td>
       </tr>;})}</tbody></table>:<Empty icon={I.check} t="오류 없음" d="최근 기록된 오류가 없습니다"/>}
     </div>
   </div>;
@@ -997,7 +1186,7 @@ function App(){
           </div>}
         </div>
       </header>
-      <div className="content">{PAGES[page]}</div>
+      <div className="content" key={page} style={{animation:'fadeUp .28s ease'}}>{PAGES[page]}</div>
     </main>
     {toastMsg&&<div className={'toast '+(toastMsg.type||'')}>{toastMsg.type==='ok'?I.check:toastMsg.type==='err'?I.x:null}{toastMsg.m}</div>}
   </div>;
