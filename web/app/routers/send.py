@@ -417,24 +417,46 @@ def supported_formats(user=Depends(get_current_user)):
 # ===================== 발송 관리 =====================
 @router.get('/jobs-filtered')
 def list_jobs_filtered(
-    status: str = None, number: str = None, limit: int = 100,
+    status: str = None, number: str = None, name: str = None,
+    date_from: str = None, date_to: str = None,
+    limit: int = 50, offset: int = 0,
     user=Depends(get_current_user)):
-    """상태·번호 필터 발송 이력."""
-    limit = min(limit, 500)
+    """발송 이력 조회 (필터 + 페이지네이션).
+    - status: 상태 필터 (sent/failed/queued 등)
+    - number: 받는번호 부분검색
+    - name: 받는사람 부분검색
+    - date_from / date_to: 날짜 범위 (YYYY-MM-DD)
+    - limit/offset: 페이지네이션 (기본 50개씩)
+    반환: {items:[...], total:전체건수, limit, offset}
+    """
+    limit = min(max(int(limit), 1), 200)
+    offset = max(int(offset), 0)
     cond = ['user_id=%s'] if user['role'] not in ('admin', 'manager') else []
     params = [user['user_id']] if user['role'] not in ('admin', 'manager') else []
     if status:
         cond.append('status=%s'); params.append(status)
     if number:
         cond.append('to_number LIKE %s'); params.append(f'%{number}%')
+    if name:
+        cond.append('to_name LIKE %s'); params.append(f'%{name}%')
+    if date_from:
+        cond.append('created_at >= %s'); params.append(date_from)
+    if date_to:
+        # date_to 당일 끝까지 포함
+        cond.append('created_at < (%s::date + 1)'); params.append(date_to)
+    where = (' WHERE ' + ' AND '.join(cond)) if cond else ''
+
+    # 전체 개수 (페이지네이션용)
+    total_row = db.query_one(f'SELECT COUNT(*) AS c FROM fax_jobs{where}', tuple(params))
+    total = total_row['c'] if total_row else 0
+
+    # 페이지 데이터
     sql = ('SELECT id, to_number, to_name, file_name, pages, status, '
            'cover_used, server_job_id, batch_id, result_text, retry_count, '
-           'created_at, sent_at FROM fax_jobs')
-    if cond:
-        sql += ' WHERE ' + ' AND '.join(cond)
-    sql += ' ORDER BY id DESC LIMIT %s'
-    params.append(limit)
-    return db.query(sql, tuple(params))
+           f'created_at, sent_at FROM fax_jobs{where} '
+           'ORDER BY id DESC LIMIT %s OFFSET %s')
+    items = db.query(sql, tuple(params) + (limit, offset))
+    return {'items': items, 'total': total, 'limit': limit, 'offset': offset}
 
 
 @router.post('/jobs/{job_id}/cancel')

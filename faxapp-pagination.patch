@@ -1,0 +1,205 @@
+diff --git a/web/app/routers/receive.py b/web/app/routers/receive.py
+index 0528fb7..e3b1469 100644
+--- a/web/app/routers/receive.py
++++ b/web/app/routers/receive.py
+@@ -3,7 +3,7 @@
+ 미리보기(파일 다운로드), 읽음 표시, 메모 첨부.
+ """
+ import os
+-from fastapi import APIRouter, Depends, Request
++from fastapi import APIRouter, Depends, Request, Response
+ from fastapi.responses import FileResponse
+ from pydantic import BaseModel
+ from typing import Optional
+@@ -59,14 +59,19 @@ def receive_webhook(body: WebhookBody, request: Request):
+ 
+ 
+ @router.get('/inbox')
+-def inbox(unread_only: bool = False, limit: int = 50, user=Depends(get_current_user)):
++def inbox(response: Response, unread_only: bool = False, limit: int = 50, offset: int = 0,
++          user=Depends(get_current_user)):
+     """
+     수신함. 권한에 따라 범위 결정:
+     - admin: 전체
+     - manager: 자기 부서
+     - user: 자기 앞으로 온 것 + 부서 공용(미배정)
++
++    limit/offset 으로 페이지 단위 조회. 전체 건수는 응답 헤더 X-Total-Count 로 반환
++    (기존 배열 응답 형태는 그대로 유지 - 하위 호환).
+     """
+     limit = min(limit, 200)
++    offset = max(offset, 0)
+     base = ('SELECT id, from_number, to_number, dept_id, user_id, pages, rate, '
+             'is_read, memo, received_at FROM fax_received')
+     cond, params = [], []
+@@ -88,12 +93,16 @@ def inbox(unread_only: bool = False, limit: int = 50, user=Depends(get_current_u
+     if unread_only:
+         cond.append('is_read = false')
+ 
+-    sql = base
+-    if cond:
+-        sql += ' WHERE ' + ' AND '.join(cond)
+-    sql += ' ORDER BY id DESC LIMIT %s'
+-    params.append(limit)
+-    return db.query(sql, tuple(params))
++    where = (' WHERE ' + ' AND '.join(cond)) if cond else ''
++    total = db.query_one(f'SELECT COUNT(*) AS c FROM fax_received{where}', tuple(params))['c']
++
++    sql = base + where + ' ORDER BY id DESC LIMIT %s OFFSET %s'
++    rows = db.query(sql, tuple(params) + (limit, offset))
++
++    response.headers['X-Total-Count'] = str(total)
++    response.headers['X-Limit'] = str(limit)
++    response.headers['X-Offset'] = str(offset)
++    return rows
+ 
+ 
+ class RecvBulkBody(BaseModel):
+diff --git a/web/app/routers/send.py b/web/app/routers/send.py
+index 23280d4..10f9fba 100644
+--- a/web/app/routers/send.py
++++ b/web/app/routers/send.py
+@@ -7,7 +7,7 @@ import re
+ import uuid
+ import shutil
+ from datetime import datetime
+-from fastapi import APIRouter, Depends, UploadFile, File, Form, Request
++from fastapi import APIRouter, Depends, UploadFile, File, Form, Request, Response
+ from pydantic import BaseModel
+ from typing import List, Optional
+ 
+@@ -417,24 +417,35 @@ def supported_formats(user=Depends(get_current_user)):
+ # ===================== 발송 관리 =====================
+ @router.get('/jobs-filtered')
+ def list_jobs_filtered(
+-    status: str = None, number: str = None, limit: int = 100,
++    response: Response,
++    status: str = None, number: str = None, limit: int = 100, offset: int = 0,
+     user=Depends(get_current_user)):
+-    """상태·번호 필터 발송 이력."""
++    """상태·번호 필터 발송 이력 (페이지네이션 지원).
++    - limit/offset 으로 페이지 단위 조회.
++    - 전체 건수는 응답 헤더 X-Total-Count 로 반환 (기존 배열 응답 형태 유지 - 하위 호환).
++    """
+     limit = min(limit, 500)
++    offset = max(offset, 0)
+     cond = ['user_id=%s'] if user['role'] not in ('admin', 'manager') else []
+     params = [user['user_id']] if user['role'] not in ('admin', 'manager') else []
+     if status:
+         cond.append('status=%s'); params.append(status)
+     if number:
+         cond.append('to_number LIKE %s'); params.append(f'%{number}%')
++    where = (' WHERE ' + ' AND '.join(cond)) if cond else ''
++
++    total = db.query_one(f'SELECT COUNT(*) AS c FROM fax_jobs{where}', tuple(params))['c']
++
+     sql = ('SELECT id, to_number, to_name, file_name, pages, status, '
+            'cover_used, server_job_id, batch_id, result_text, retry_count, '
+-           'created_at, sent_at FROM fax_jobs')
+-    if cond:
+-        sql += ' WHERE ' + ' AND '.join(cond)
+-    sql += ' ORDER BY id DESC LIMIT %s'
+-    params.append(limit)
+-    return db.query(sql, tuple(params))
++           'created_at, sent_at FROM fax_jobs' + where +
++           ' ORDER BY id DESC LIMIT %s OFFSET %s')
++    rows = db.query(sql, tuple(params) + (limit, offset))
++
++    response.headers['X-Total-Count'] = str(total)
++    response.headers['X-Limit'] = str(limit)
++    response.headers['X-Offset'] = str(offset)
++    return rows
+ 
+ 
+ @router.post('/jobs/{job_id}/cancel')
+diff --git a/web/static/index.html b/web/static/index.html
+index b2beeb1..08ff807 100644
+--- a/web/static/index.html
++++ b/web/static/index.html
+@@ -333,6 +333,27 @@ async function api(path,opts={}){
+   if(!r.ok){const e=await r.json().catch(()=>({detail:r.statusText}));throw new Error(e.detail||'요청을 처리하지 못했습니다');}
+   return r.status===204?null:r.json();
+ }
++// 목록 조회 - X-Total-Count 헤더까지 함께 반환 (페이지네이션용)
++async function apiPaged(path,opts={}){
++  const r=await fetch(API+path,{credentials:'include',headers:opts.body&&!(opts.body instanceof FormData)?{'Content-Type':'application/json'}:{},...opts});
++  if(!r.ok){const e=await r.json().catch(()=>({detail:r.statusText}));throw new Error(e.detail||'요청을 처리하지 못했습니다');}
++  const items=r.status===204?[]:await r.json();
++  const total=parseInt(r.headers.get('X-Total-Count'),10);
++  return {items, total:Number.isFinite(total)?total:items.length};
++}
++// 페이지네이션 컨트롤 (이전/다음 + 현재 범위 표시)
++function Pager({total,limit,offset,setOffset}){
++  if(total<=limit && offset===0) return null;
++  const from=total===0?0:offset+1, to=Math.min(offset+limit,total);
++  const page=Math.floor(offset/limit)+1, pages=Math.max(1,Math.ceil(total/limit));
++  return <div className="btn-row" style={{justifyContent:'space-between',alignItems:'center',padding:'10px 2px'}}>
++    <span className="dim" style={{fontSize:12.5}}>{total}건 중 {from}-{to} · {page}/{pages}페이지</span>
++    <div className="btn-row">
++      <button className="btn btn-s" disabled={offset===0} onClick={()=>setOffset(Math.max(0,offset-limit))}>이전</button>
++      <button className="btn btn-s" disabled={offset+limit>=total} onClick={()=>setOffset(offset+limit)}>다음</button>
++    </div>
++  </div>;
++}
+ const J=o=>JSON.stringify(o);
+ const fmt=ts=>{if(!ts)return'-';const s=String(ts);return s.slice(5,16).replace('T',' ');};
+ function Loading(){return <div className="center-load"><span className="spinner"/></div>;}
+@@ -547,8 +568,15 @@ function SendHistory({toast}){
+   const [jobs,setJobs]=useState(null),[pv,setPv]=useState(null),[filter,setFilter]=useState(''),[stats,setStats]=useState({}),[busy,setBusy]=useState(false);
+   const [sel,setSel]=useState(new Set());
+   const [pageResend,setPageResend]=useState(null);  // {job, spec}
+-  const load=()=>{api('/api/fax/jobs-filtered'+(filter?'?status='+filter:'')).then(setJobs).catch(()=>setJobs([]));api('/api/fax/jobs/stats-quick').then(setStats).catch(()=>{});setSel(new Set());};
+-  useEffect(()=>{load();},[filter]);
++  const LIMIT=50;
++  const [offset,setOffset]=useState(0),[total,setTotal]=useState(0);
++  const load=()=>{
++    const q='?limit='+LIMIT+'&offset='+offset+(filter?'&status='+filter:'');
++    apiPaged('/api/fax/jobs-filtered'+q).then(({items,total})=>{setJobs(items);setTotal(total);}).catch(()=>{setJobs([]);setTotal(0);});
++    api('/api/fax/jobs/stats-quick').then(setStats).catch(()=>{});setSel(new Set());
++  };
++  useEffect(()=>{setOffset(0);},[filter]);
++  useEffect(()=>{load();},[filter,offset]);
+   const act=async(fn,msg)=>{try{const r=await fn();toast(r.message||msg,'ok');load();}catch(e){toast(e.message,'err');}};
+   const sync=async()=>{setBusy(true);await act(()=>api('/api/fax/jobs/sync',{method:'POST'}),'동기화 완료');setBusy(false);};
+   const cancelAll=()=>{act(()=>api('/api/fax/jobs/cancel-pending',{method:'POST'}),'대기 건 취소 완료');};
+@@ -607,6 +635,7 @@ function SendHistory({toast}){
+           {(j.status==='failed'||j.status==='cancelled')&&<button className="btn btn-x" onClick={()=>act(()=>api('/api/fax/jobs/'+j.id+'/resend',{method:'POST'}),'재전송됨')}>재전송</button>}
+           {(j.status==='sent'||j.status==='failed')&&(j.pages||0)>1&&<button className="btn btn-x" onClick={()=>setPageResend({job:j,spec:''})}>페이지 재전송</button>}
+         </div></td></tr>;})}</tbody></table>:<Empty icon={I.send} t="발송 이력이 없습니다" d="팩스를 보내면 여기에 기록됩니다. 발송 상태와 결과를 실시간으로 확인할 수 있습니다."/>}
++      <Pager total={total} limit={LIMIT} offset={offset} setOffset={setOffset}/>
+     </div>
+     {pv&&<PreviewModal {...pv} onClose={()=>setPv(null)}/>}
+     {pageResend&&<div className="modal-bg" onClick={()=>setPageResend(null)}>
+@@ -636,8 +665,13 @@ function Inbox({toast,user}){
+   const [list,setList]=useState(null),[pv,setPv]=useState(null),[memoId,setMemoId]=useState(null),[memoText,setMemoText]=useState(''),[users,setUsers]=useState([]);
+   const [fwd,setFwd]=useState(null),[fwdNum,setFwdNum]=useState(''),[fwdName,setFwdName]=useState(''),[fwdBusy,setFwdBusy]=useState(false);
+   const [sel,setSel]=useState(new Set());
+-  const load=()=>{api('/api/receive/inbox').then(setList).catch(()=>setList([]));setSel(new Set());};
+-  useEffect(()=>{load();if(user.role==='admin'||user.role==='manager')api('/api/users').then(setUsers).catch(()=>{});},[]);
++  const LIMIT=50;
++  const [offset,setOffset]=useState(0),[total,setTotal]=useState(0);
++  const load=()=>{
++    apiPaged('/api/receive/inbox?limit='+LIMIT+'&offset='+offset).then(({items,total})=>{setList(items);setTotal(total);}).catch(()=>{setList([]);setTotal(0);});
++    setSel(new Set());
++  };
++  useEffect(()=>{load();if(user.role==='admin'||user.role==='manager')api('/api/users').then(setUsers).catch(()=>{});},[offset]);
+   const toggle=(id)=>{setSel(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});};
+   const toggleAll=()=>{setSel(prev=>prev.size===(list||[]).length?new Set():new Set((list||[]).map(r=>r.id)));};
+   const bulkDelete=async()=>{const ids=[...sel];if(!ids.length){toast('삭제할 항목을 선택하세요','err');return;}
+@@ -650,7 +684,7 @@ function Inbox({toast,user}){
+   const canAssign=user.role==='admin'||user.role==='manager';
+   if(!list)return <Loading/>;
+   return <div className="card">
+-    <div className="card-h"><div className="card-t">받은 팩스 {list.length>0&&<span className="muted">· {list.length}건</span>}</div>
++    <div className="card-h"><div className="card-t">받은 팩스 {total>0&&<span className="muted">· {total}건</span>}</div>
+       <div className="btn-row">{sel.size>0&&<button className="btn btn-s btn-err" onClick={bulkDelete}>선택 삭제 ({sel.size})</button>}<a className="btn btn-s" href={API+'/api/data/export/received'} download>{I.download}엑셀</a><button className="btn btn-s" onClick={load}>{I.refresh}새로고침</button></div></div>
+     {list.length?<table className="tbl"><thead><tr><th style={{width:32}}><input type="checkbox" checked={sel.size>0&&sel.size===list.length} onChange={toggleAll}/></th><th>수신시각</th><th>발신번호</th><th>수신번호</th><th className="num">쪽</th><th>메모</th>{canAssign&&<th>배정</th>}<th></th></tr></thead>
+     <tbody>{list.map(r=><tr key={r.id}>
+@@ -663,6 +697,7 @@ function Inbox({toast,user}){
+         <button className="btn btn-x" onClick={()=>setPv({url:API+'/api/preview/received/'+r.id,title:'수신 #'+r.id})}>{I.eye}보기</button>
+         <button className="btn btn-x" onClick={()=>{setFwd(r);setFwdNum('');setFwdName('');}}>전달</button></div></td>
+     </tr>)}</tbody></table>:<Empty icon={I.inbox} t="받은 팩스가 없습니다" d="수신된 팩스가 여기에 표시됩니다"/>}
++    <Pager total={total} limit={LIMIT} offset={offset} setOffset={setOffset}/>
+     {pv&&<PreviewModal {...pv} onClose={()=>{setPv(null);load();}}/>}
+     {fwd&&<div className="scrim" onClick={()=>setFwd(null)}><div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
+       <div className="modal-h"><div className="card-t">팩스 전달</div><button className="btn btn-x" onClick={()=>setFwd(null)}>{I.x}</button></div>

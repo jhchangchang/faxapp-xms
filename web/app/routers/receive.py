@@ -59,27 +59,27 @@ def receive_webhook(body: WebhookBody, request: Request):
 
 
 @router.get('/inbox')
-def inbox(unread_only: bool = False, limit: int = 50, user=Depends(get_current_user)):
+def inbox(unread_only: bool = False, from_number: str = None,
+          date_from: str = None, date_to: str = None,
+          limit: int = 50, offset: int = 0,
+          user=Depends(get_current_user)):
+    """수신함 (권한별 범위 + 페이지네이션 + 검색).
+    - admin: 전체 / manager: 부서 / user: 본인+부서공용
+    - from_number: 발신번호 검색, date_from/to: 기간
+    - limit/offset: 페이지네이션 (기본 50)
+    반환: {items, total, limit, offset}
     """
-    수신함. 권한에 따라 범위 결정:
-    - admin: 전체
-    - manager: 자기 부서
-    - user: 자기 앞으로 온 것 + 부서 공용(미배정)
-    """
-    limit = min(limit, 200)
-    base = ('SELECT id, from_number, to_number, dept_id, user_id, pages, rate, '
-            'is_read, memo, received_at FROM fax_received')
+    limit = min(max(int(limit), 1), 200)
+    offset = max(int(offset), 0)
     cond, params = [], []
 
     if user['role'] == 'admin':
         pass
     elif user['role'] == 'manager':
-        # 자기 부서 것
         me = db.query_one('SELECT dept_id FROM users WHERE id=%s', (user['user_id'],))
         dept = me['dept_id'] if me else None
         cond.append('dept_id = %s'); params.append(dept)
     else:
-        # 본인 앞 + 본인 부서 미배정
         me = db.query_one('SELECT dept_id FROM users WHERE id=%s', (user['user_id'],))
         dept = me['dept_id'] if me else None
         cond.append('(user_id = %s OR (dept_id = %s AND user_id IS NULL))')
@@ -87,13 +87,22 @@ def inbox(unread_only: bool = False, limit: int = 50, user=Depends(get_current_u
 
     if unread_only:
         cond.append('is_read = false')
+    if from_number:
+        cond.append('from_number LIKE %s'); params.append(f'%{from_number}%')
+    if date_from:
+        cond.append('received_at >= %s'); params.append(date_from)
+    if date_to:
+        cond.append('received_at < (%s::date + 1)'); params.append(date_to)
 
-    sql = base
-    if cond:
-        sql += ' WHERE ' + ' AND '.join(cond)
-    sql += ' ORDER BY id DESC LIMIT %s'
-    params.append(limit)
-    return db.query(sql, tuple(params))
+    where = (' WHERE ' + ' AND '.join(cond)) if cond else ''
+    total_row = db.query_one(f'SELECT COUNT(*) AS c FROM fax_received{where}', tuple(params))
+    total = total_row['c'] if total_row else 0
+
+    sql = ('SELECT id, from_number, to_number, dept_id, user_id, pages, rate, '
+           f'is_read, memo, received_at FROM fax_received{where} '
+           'ORDER BY id DESC LIMIT %s OFFSET %s')
+    items = db.query(sql, tuple(params) + (limit, offset))
+    return {'items': items, 'total': total, 'limit': limit, 'offset': offset}
 
 
 class RecvBulkBody(BaseModel):

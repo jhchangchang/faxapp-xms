@@ -547,8 +547,27 @@ function SendHistory({toast}){
   const [jobs,setJobs]=useState(null),[pv,setPv]=useState(null),[filter,setFilter]=useState(''),[stats,setStats]=useState({}),[busy,setBusy]=useState(false);
   const [sel,setSel]=useState(new Set());
   const [pageResend,setPageResend]=useState(null);  // {job, spec}
-  const load=()=>{api('/api/fax/jobs-filtered'+(filter?'?status='+filter:'')).then(setJobs).catch(()=>setJobs([]));api('/api/fax/jobs/stats-quick').then(setStats).catch(()=>{});setSel(new Set());};
-  useEffect(()=>{load();},[filter]);
+  // 페이지네이션 + 검색
+  const [total,setTotal]=useState(0),[offset,setOffset]=useState(0);
+  const [qNum,setQNum]=useState(''),[qName,setQName]=useState(''),[qFrom,setQFrom]=useState(''),[qTo,setQTo]=useState('');
+  const PAGE_SIZE=50;
+  const load=(off=offset)=>{
+    const p=new URLSearchParams();
+    if(filter)p.set('status',filter);
+    if(qNum)p.set('number',qNum);
+    if(qName)p.set('name',qName);
+    if(qFrom)p.set('date_from',qFrom);
+    if(qTo)p.set('date_to',qTo);
+    p.set('limit',PAGE_SIZE);p.set('offset',off);
+    api('/api/fax/jobs-filtered?'+p.toString()).then(r=>{
+      setJobs(r.items||[]);setTotal(r.total||0);setOffset(r.offset||0);
+    }).catch(()=>{setJobs([]);setTotal(0);});
+    api('/api/fax/jobs/stats-quick').then(setStats).catch(()=>{});
+    setSel(new Set());
+  };
+  useEffect(()=>{setOffset(0);load(0);},[filter]);
+  const doSearch=()=>{setOffset(0);load(0);};
+  const goPage=(off)=>{setOffset(off);load(off);};
   const act=async(fn,msg)=>{try{const r=await fn();toast(r.message||msg,'ok');load();}catch(e){toast(e.message,'err');}};
   const sync=async()=>{setBusy(true);await act(()=>api('/api/fax/jobs/sync',{method:'POST'}),'동기화 완료');setBusy(false);};
   const cancelAll=()=>{act(()=>api('/api/fax/jobs/cancel-pending',{method:'POST'}),'대기 건 취소 완료');};
@@ -595,6 +614,18 @@ function SendHistory({toast}){
         {sel.size>0&&<button className="btn btn-s btn-err" onClick={()=>bulkDelete(true)}>강제 삭제 ({sel.size})</button>}
         <a className="btn btn-s" href={API+'/api/data/export/send-history'+(filter?'?status='+filter:'')} download>{I.download}엑셀</a>
       </div></div>
+      {/* 검색 바 */}
+      <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--border)',flexWrap:'wrap',alignItems:'center',background:'var(--surface-2)'}}>
+        <input placeholder="받는번호" value={qNum} onChange={e=>setQNum(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doSearch()} style={{padding:'7px 11px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:13,width:130}}/>
+        <input placeholder="받는사람" value={qName} onChange={e=>setQName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doSearch()} style={{padding:'7px 11px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:13,width:110}}/>
+        <span style={{fontSize:12,color:'var(--text-3)'}}>기간</span>
+        <input type="date" value={qFrom} onChange={e=>setQFrom(e.target.value)} style={{padding:'6px 9px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:12.5}}/>
+        <span style={{color:'var(--text-3)'}}>~</span>
+        <input type="date" value={qTo} onChange={e=>setQTo(e.target.value)} style={{padding:'6px 9px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:12.5}}/>
+        <button className="btn btn-s btn-a" onClick={doSearch}>검색</button>
+        {(qNum||qName||qFrom||qTo)&&<button className="btn btn-s" onClick={()=>{setQNum('');setQName('');setQFrom('');setQTo('');setOffset(0);setTimeout(()=>load(0),0);}}>초기화</button>}
+        <span style={{marginLeft:'auto',fontSize:12.5,color:'var(--text-3)'}}>총 <b style={{color:'var(--text)'}}>{total.toLocaleString()}</b>건</span>
+      </div>
       {jobs.length?<table className="tbl"><thead><tr><th style={{width:32}}><input type="checkbox" checked={sel.size>0&&sel.size===jobs.length} onChange={toggleAll}/></th><th>시각</th><th>받는번호</th><th>받는사람</th><th>파일</th><th className="num">쪽</th><th>상태</th><th></th></tr></thead>
       <tbody>{jobs.map(j=>{const a=ST[j.status]||['b-dim',j.status];return <tr key={j.id}>
         <td><input type="checkbox" checked={sel.has(j.id)} onChange={()=>toggle(j.id)}/></td>
@@ -607,6 +638,15 @@ function SendHistory({toast}){
           {(j.status==='failed'||j.status==='cancelled')&&<button className="btn btn-x" onClick={()=>act(()=>api('/api/fax/jobs/'+j.id+'/resend',{method:'POST'}),'재전송됨')}>재전송</button>}
           {(j.status==='sent'||j.status==='failed')&&(j.pages||0)>1&&<button className="btn btn-x" onClick={()=>setPageResend({job:j,spec:''})}>페이지 재전송</button>}
         </div></td></tr>;})}</tbody></table>:<Empty icon={I.send} t="발송 이력이 없습니다" d="팩스를 보내면 여기에 기록됩니다. 발송 상태와 결과를 실시간으로 확인할 수 있습니다."/>}
+      {/* 페이지네이션 */}
+      {total>PAGE_SIZE&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,padding:'14px',borderTop:'1px solid var(--border)'}}>
+        <button className="btn btn-s" disabled={offset<=0} onClick={()=>goPage(Math.max(0,offset-PAGE_SIZE))}>← 이전</button>
+        <span style={{fontSize:13,color:'var(--text-2)',fontWeight:600}}>
+          {Math.floor(offset/PAGE_SIZE)+1} / {Math.max(1,Math.ceil(total/PAGE_SIZE))} 페이지
+          <span style={{color:'var(--text-3)',fontWeight:400,marginLeft:8}}>({offset+1}–{Math.min(offset+PAGE_SIZE,total)} / {total.toLocaleString()})</span>
+        </span>
+        <button className="btn btn-s" disabled={offset+PAGE_SIZE>=total} onClick={()=>goPage(offset+PAGE_SIZE)}>다음 →</button>
+      </div>}
     </div>
     {pv&&<PreviewModal {...pv} onClose={()=>setPv(null)}/>}
     {pageResend&&<div className="modal-bg" onClick={()=>setPageResend(null)}>
@@ -636,8 +676,25 @@ function Inbox({toast,user}){
   const [list,setList]=useState(null),[pv,setPv]=useState(null),[memoId,setMemoId]=useState(null),[memoText,setMemoText]=useState(''),[users,setUsers]=useState([]);
   const [fwd,setFwd]=useState(null),[fwdNum,setFwdNum]=useState(''),[fwdName,setFwdName]=useState(''),[fwdBusy,setFwdBusy]=useState(false);
   const [sel,setSel]=useState(new Set());
-  const load=()=>{api('/api/receive/inbox').then(setList).catch(()=>setList([]));setSel(new Set());};
-  useEffect(()=>{load();if(user.role==='admin'||user.role==='manager')api('/api/users').then(setUsers).catch(()=>{});},[]);
+  const [total,setTotal]=useState(0),[offset,setOffset]=useState(0);
+  const [qFrom2,setQFrom2]=useState(''),[qDF,setQDF]=useState(''),[qDT,setQDT]=useState(''),[unreadOnly,setUnreadOnly]=useState(false);
+  const PAGE_SIZE=50;
+  const load=(off=offset)=>{
+    const p=new URLSearchParams();
+    if(qFrom2)p.set('from_number',qFrom2);
+    if(qDF)p.set('date_from',qDF);
+    if(qDT)p.set('date_to',qDT);
+    if(unreadOnly)p.set('unread_only','true');
+    p.set('limit',PAGE_SIZE);p.set('offset',off);
+    api('/api/receive/inbox?'+p.toString()).then(r=>{
+      setList(r.items||[]);setTotal(r.total||0);setOffset(r.offset||0);
+    }).catch(()=>{setList([]);setTotal(0);});
+    setSel(new Set());
+  };
+  useEffect(()=>{load(0);if(user.role==='admin'||user.role==='manager')api('/api/users').then(setUsers).catch(()=>{});},[]);
+  useEffect(()=>{setOffset(0);load(0);},[unreadOnly]);
+  const doSearch=()=>{setOffset(0);load(0);};
+  const goPage=(off)=>{setOffset(off);load(off);};
   const toggle=(id)=>{setSel(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});};
   const toggleAll=()=>{setSel(prev=>prev.size===(list||[]).length?new Set():new Set((list||[]).map(r=>r.id)));};
   const bulkDelete=async()=>{const ids=[...sel];if(!ids.length){toast('삭제할 항목을 선택하세요','err');return;}
@@ -650,8 +707,19 @@ function Inbox({toast,user}){
   const canAssign=user.role==='admin'||user.role==='manager';
   if(!list)return <Loading/>;
   return <div className="card">
-    <div className="card-h"><div className="card-t">받은 팩스 {list.length>0&&<span className="muted">· {list.length}건</span>}</div>
-      <div className="btn-row">{sel.size>0&&<button className="btn btn-s btn-err" onClick={bulkDelete}>선택 삭제 ({sel.size})</button>}<a className="btn btn-s" href={API+'/api/data/export/received'} download>{I.download}엑셀</a><button className="btn btn-s" onClick={load}>{I.refresh}새로고침</button></div></div>
+    <div className="card-h"><div className="card-t">받은 팩스 {total>0&&<span className="muted">· 총 {total.toLocaleString()}건</span>}</div>
+      <div className="btn-row">{sel.size>0&&<button className="btn btn-s btn-err" onClick={bulkDelete}>선택 삭제 ({sel.size})</button>}<a className="btn btn-s" href={API+'/api/data/export/received'} download>{I.download}엑셀</a><button className="btn btn-s" onClick={()=>load()}>{I.refresh}새로고침</button></div></div>
+    {/* 검색 바 */}
+    <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--border)',flexWrap:'wrap',alignItems:'center',background:'var(--surface-2)'}}>
+      <label className="check" style={{marginRight:6}}><input type="checkbox" checked={unreadOnly} onChange={e=>setUnreadOnly(e.target.checked)}/>안읽음만</label>
+      <input placeholder="발신번호" value={qFrom2} onChange={e=>setQFrom2(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doSearch()} style={{padding:'7px 11px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:13,width:130}}/>
+      <span style={{fontSize:12,color:'var(--text-3)'}}>기간</span>
+      <input type="date" value={qDF} onChange={e=>setQDF(e.target.value)} style={{padding:'6px 9px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:12.5}}/>
+      <span style={{color:'var(--text-3)'}}>~</span>
+      <input type="date" value={qDT} onChange={e=>setQDT(e.target.value)} style={{padding:'6px 9px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:12.5}}/>
+      <button className="btn btn-s btn-a" onClick={doSearch}>검색</button>
+      {(qFrom2||qDF||qDT)&&<button className="btn btn-s" onClick={()=>{setQFrom2('');setQDF('');setQDT('');setOffset(0);setTimeout(()=>load(0),0);}}>초기화</button>}
+    </div>
     {list.length?<table className="tbl"><thead><tr><th style={{width:32}}><input type="checkbox" checked={sel.size>0&&sel.size===list.length} onChange={toggleAll}/></th><th>수신시각</th><th>발신번호</th><th>수신번호</th><th className="num">쪽</th><th>메모</th>{canAssign&&<th>배정</th>}<th></th></tr></thead>
     <tbody>{list.map(r=><tr key={r.id}>
       <td><input type="checkbox" checked={sel.has(r.id)} onChange={()=>toggle(r.id)}/></td>
@@ -663,6 +731,14 @@ function Inbox({toast,user}){
         <button className="btn btn-x" onClick={()=>setPv({url:API+'/api/preview/received/'+r.id,title:'수신 #'+r.id})}>{I.eye}보기</button>
         <button className="btn btn-x" onClick={()=>{setFwd(r);setFwdNum('');setFwdName('');}}>전달</button></div></td>
     </tr>)}</tbody></table>:<Empty icon={I.inbox} t="받은 팩스가 없습니다" d="수신된 팩스가 여기에 표시됩니다"/>}
+    {total>PAGE_SIZE&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,padding:'14px',borderTop:'1px solid var(--border)'}}>
+      <button className="btn btn-s" disabled={offset<=0} onClick={()=>goPage(Math.max(0,offset-PAGE_SIZE))}>← 이전</button>
+      <span style={{fontSize:13,color:'var(--text-2)',fontWeight:600}}>
+        {Math.floor(offset/PAGE_SIZE)+1} / {Math.max(1,Math.ceil(total/PAGE_SIZE))} 페이지
+        <span style={{color:'var(--text-3)',fontWeight:400,marginLeft:8}}>({offset+1}–{Math.min(offset+PAGE_SIZE,total)} / {total.toLocaleString()})</span>
+      </span>
+      <button className="btn btn-s" disabled={offset+PAGE_SIZE>=total} onClick={()=>goPage(offset+PAGE_SIZE)}>다음 →</button>
+    </div>}
     {pv&&<PreviewModal {...pv} onClose={()=>{setPv(null);load();}}/>}
     {fwd&&<div className="scrim" onClick={()=>setFwd(null)}><div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:420}}>
       <div className="modal-h"><div className="card-t">팩스 전달</div><button className="btn btn-x" onClick={()=>setFwd(null)}>{I.x}</button></div>
