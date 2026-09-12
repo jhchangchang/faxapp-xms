@@ -16,24 +16,42 @@ def list_errors(
     category: str = None,
     code: str = None,
     resolved: bool = None,
-    limit: int = Query(default=100, le=500),
+    date_from: str = None,
+    date_to: str = None,
+    limit: int = 50,
+    offset: int = 0,
     user=Depends(require_admin)):
-    """오류 로그 조회 (필터: 성격·코드·처리여부)."""
+    """오류 로그 조회 (필터 + 페이지네이션).
+    - category: 성격, code: 코드, resolved: 처리여부
+    - date_from/date_to: 날짜 범위 (YYYY-MM-DD)
+    - limit/offset: 페이지네이션 (기본 50)
+    반환: {items, total, limit, offset}
+    """
+    limit = min(max(int(limit), 1), 200)
+    offset = max(int(offset), 0)
     cond, params = [], []
     if category:
-        cond.append('category=%s'); params.append(category)
+        cond.append('e.category=%s'); params.append(category)
     if code:
-        cond.append('code=%s'); params.append(code)
+        cond.append('e.code=%s'); params.append(code)
     if resolved is not None:
-        cond.append('resolved=%s'); params.append(resolved)
+        cond.append('e.resolved=%s'); params.append(resolved)
+    if date_from:
+        cond.append('e.created_at >= %s'); params.append(date_from)
+    if date_to:
+        cond.append('e.created_at < (%s::date + 1)'); params.append(date_to)
+    where = (' WHERE ' + ' AND '.join(cond)) if cond else ''
+
+    total_row = db.query_one(
+        f'SELECT COUNT(*) AS c FROM error_log e{where}', tuple(params))
+    total = total_row['c'] if total_row else 0
+
     sql = ('SELECT e.id, e.code, e.category, e.detail, e.context, e.path, '
            'e.user_id, u.username, e.job_id, e.resolved, e.created_at '
-           'FROM error_log e LEFT JOIN users u ON e.user_id=u.id')
-    if cond:
-        sql += ' WHERE ' + ' AND '.join(cond)
-    sql += ' ORDER BY e.id DESC LIMIT %s'
-    params.append(limit)
-    return db.query(sql, tuple(params))
+           f'FROM error_log e LEFT JOIN users u ON e.user_id=u.id{where} '
+           'ORDER BY e.id DESC LIMIT %s OFFSET %s')
+    items = db.query(sql, tuple(params) + (limit, offset))
+    return {'items': items, 'total': total, 'limit': limit, 'offset': offset}
 
 
 @router.get('/summary')

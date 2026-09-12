@@ -1155,9 +1155,25 @@ function NotifyConfig({toast}){
 function ErrorLog({toast}){
   const [sum,setSum]=useState(null),[list,setList]=useState(null),[cat,setCat]=useState('');
   const [sel,setSel]=useState(new Set());
-  const load=()=>{api('/api/errors/summary?days=7').then(setSum).catch(()=>setSum({total:0,unresolved:0,by_category:[],by_code:[]}));
-    api('/api/errors'+(cat?'?category='+cat:'')).then(setList).catch(()=>setList([]));setSel(new Set());};
-  useEffect(()=>{load();},[cat]);
+  const [total,setTotal]=useState(0),[offset,setOffset]=useState(0);
+  const [qCode,setQCode]=useState(''),[qDF,setQDF]=useState(''),[qDT,setQDT]=useState('');
+  const PAGE_SIZE=50;
+  const load=(off=offset)=>{
+    api('/api/errors/summary?days=7').then(setSum).catch(()=>setSum({total:0,unresolved:0,by_category:[],by_code:[]}));
+    const p=new URLSearchParams();
+    if(cat)p.set('category',cat);
+    if(qCode)p.set('code',qCode);
+    if(qDF)p.set('date_from',qDF);
+    if(qDT)p.set('date_to',qDT);
+    p.set('limit',PAGE_SIZE);p.set('offset',off);
+    api('/api/errors?'+p.toString()).then(r=>{
+      setList(r.items||[]);setTotal(r.total||0);setOffset(r.offset||0);
+    }).catch(()=>{setList([]);setTotal(0);});
+    setSel(new Set());
+  };
+  useEffect(()=>{setOffset(0);load(0);},[cat]);
+  const doSearch=()=>{setOffset(0);load(0);};
+  const goPage=(off)=>{setOffset(off);load(off);};
   const resolve=async id=>{try{await api('/api/errors/'+id+'/resolve',{method:'POST'});load();}catch(e){toast(e.message,'err');}};
   const resolveAll=async()=>{try{await api('/api/errors/resolve-all',{method:'POST'});toast('전체 처리 완료','ok');load();}catch(e){toast(e.message,'err');}};
   const clearAll=async()=>{try{const r=await api('/api/errors/clear-all?confirm=true',{method:'DELETE'});toast(r.message||'전체 삭제됨','ok');load();}catch(e){toast(e.message,'err');}};
@@ -1183,6 +1199,17 @@ function ErrorLog({toast}){
         {sel.size>0&&<button className="btn btn-s" onClick={bulkDel} style={{color:'#e0483d'}}>선택 삭제 ({sel.size})</button>}
         {sum.unresolved>0&&<button className="btn btn-s" onClick={resolveAll}>{I.check}전체 처리</button>}
         {sum.total>0&&<button className="btn btn-s" onClick={clearAll} style={{color:'#e0483d'}}>전체 삭제</button>}</div>
+      {/* 검색 바 */}
+      <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--border)',flexWrap:'wrap',alignItems:'center',background:'var(--surface-2)'}}>
+        <input placeholder="오류 코드" value={qCode} onChange={e=>setQCode(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doSearch()} style={{padding:'7px 11px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:13,width:150}}/>
+        <span style={{fontSize:12,color:'var(--text-3)'}}>기간</span>
+        <input type="date" value={qDF} onChange={e=>setQDF(e.target.value)} style={{padding:'6px 9px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:12.5}}/>
+        <span style={{color:'var(--text-3)'}}>~</span>
+        <input type="date" value={qDT} onChange={e=>setQDT(e.target.value)} style={{padding:'6px 9px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:12.5}}/>
+        <button className="btn btn-s btn-a" onClick={doSearch}>검색</button>
+        {(qCode||qDF||qDT)&&<button className="btn btn-s" onClick={()=>{setQCode('');setQDF('');setQDT('');setOffset(0);setTimeout(()=>load(0),0);}}>초기화</button>}
+        <span style={{marginLeft:'auto',fontSize:12.5,color:'var(--text-3)'}}>총 <b style={{color:'var(--text)'}}>{total.toLocaleString()}</b>건</span>
+      </div>
       {list.length?<table className="tbl"><thead><tr><th style={{width:32}}><input type="checkbox" checked={sel.size>0&&sel.size===list.length} onChange={toggleAll}/></th><th>시각</th><th>코드</th><th>성격</th><th>내용</th><th>사용자</th><th></th></tr></thead>
       <tbody>{list.map(e=>{const[cc,cl]=ECAT[e.category]||['b-dim',e.category];return <tr key={e.id} style={{opacity:e.resolved?.5:1}}>
         <td><input type="checkbox" checked={sel.has(e.id)} onChange={()=>toggle(e.id)}/></td>
@@ -1191,6 +1218,14 @@ function ErrorLog({toast}){
         <td className="dim">{e.username||'-'}</td>
         <td>{!e.resolved&&<button className="btn btn-x" onClick={()=>resolve(e.id)}>처리</button>} <button className="btn btn-x" onClick={()=>delOne(e.id)} style={{color:'#e0483d'}}>삭제</button></td>
       </tr>;})}</tbody></table>:<Empty icon={I.check} t="오류 없음" d="최근 기록된 오류가 없습니다"/>}
+      {total>PAGE_SIZE&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,padding:'14px',borderTop:'1px solid var(--border)'}}>
+        <button className="btn btn-s" disabled={offset<=0} onClick={()=>goPage(Math.max(0,offset-PAGE_SIZE))}>← 이전</button>
+        <span style={{fontSize:13,color:'var(--text-2)',fontWeight:600}}>
+          {Math.floor(offset/PAGE_SIZE)+1} / {Math.max(1,Math.ceil(total/PAGE_SIZE))} 페이지
+          <span style={{color:'var(--text-3)',fontWeight:400,marginLeft:8}}>({offset+1}–{Math.min(offset+PAGE_SIZE,total)} / {total.toLocaleString()})</span>
+        </span>
+        <button className="btn btn-s" disabled={offset+PAGE_SIZE>=total} onClick={()=>goPage(offset+PAGE_SIZE)}>다음 →</button>
+      </div>}
     </div>
   </div>;
 }
