@@ -294,6 +294,38 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .sec-head .sh-t{font-size:15px;font-weight:750;letter-spacing:-.3px}
 .sec-head .sh-more{font-size:12.5px;color:var(--accent);font-weight:600;cursor:pointer}
+
+/* ══ 실시간 채널 신호등 ══ */
+.ch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(26px,1fr));gap:7px;padding:4px 0}
+.ch-cell{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:var(--mono);transition:all .3s;position:relative}
+.ch-cell.idle{background:var(--surface-3);color:var(--text-3)}
+.ch-cell.busy{background:linear-gradient(135deg,var(--ok),#34d399);color:#fff;box-shadow:0 0 0 2px var(--ok-weak),0 2px 6px rgba(5,150,105,.3);animation:chPulse 1.6s ease-in-out infinite}
+@keyframes chPulse{0%,100%{box-shadow:0 0 0 2px var(--ok-weak),0 2px 6px rgba(5,150,105,.3)}50%{box-shadow:0 0 0 4px rgba(5,150,105,.25),0 2px 10px rgba(5,150,105,.5)}}
+.ch-legend{display:flex;gap:16px;font-size:12px;color:var(--text-2);margin-top:12px}
+.ch-legend span{display:flex;align-items:center;gap:6px}
+.ch-legend i{width:11px;height:11px;border-radius:3px}
+.ch-usage-bar{height:10px;background:var(--surface-3);border-radius:6px;overflow:hidden;margin:10px 0 4px}
+.ch-usage-fill{height:100%;background:linear-gradient(90deg,var(--ok),#34d399);border-radius:6px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+
+/* ══ 실시간 활동 피드 ══ */
+.feed{display:flex;flex-direction:column}
+.feed-item{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);animation:feedIn .4s ease}
+.feed-item:last-child{border-bottom:none}
+@keyframes feedIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.feed-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.feed-dot.ok{background:var(--ok);box-shadow:0 0 0 3px var(--ok-weak)}
+.feed-dot.err{background:var(--err);box-shadow:0 0 0 3px var(--err-weak)}
+.feed-dot.wait{background:var(--wait);box-shadow:0 0 0 3px var(--wait-weak)}
+.feed-main{flex:1;min-width:0}
+.feed-t{font-size:12.5px;font-weight:600}
+.feed-s{font-size:11px;color:var(--text-3);margin-top:1px}
+.feed-time{font-size:11px;color:var(--text-3);font-family:var(--mono);white-space:nowrap}
+
+/* 엔진 상태 맥박 (히어로) */
+.hero-status .pip{animation:pulsePip 1.5s ease-in-out infinite}
+@keyframes pulsePip{0%,100%{box-shadow:0 0 0 3px rgba(74,222,128,.3)}50%{box-shadow:0 0 0 6px rgba(74,222,128,.15)}}
+.hero-status.down .pip{animation:pulsePipDown 1.2s ease-in-out infinite}
+@keyframes pulsePipDown{0%,100%{box-shadow:0 0 0 3px rgba(248,113,113,.4)}50%{box-shadow:0 0 0 7px rgba(248,113,113,.15)}}
 </style>
 </head>
 <body>
@@ -395,6 +427,22 @@ function Dashboard({setPage}){
           <div className="metric-card"><div className="metric-ic i-amber">{I.clip}</div><div className="metric-info"><div className="mv">{proc.active||0}</div><div className="ml">발송 대기</div></div></div>
           <div className="metric-card"><div className="metric-ic i-red">{I.inbox}</div><div className="metric-info"><div className="mv">{act.unread||0}</div><div className="ml">안읽은 수신</div></div></div>
         </div>
+        {/* 실시간 채널 상태 (신호등) */}
+        {d.channels&&<div className="card">
+          <div className="card-h"><div className="card-t">실시간 채널 상태 <span className="muted">· {d.channels.busy}/{d.channels.total} 사용 중</span></div>
+            <span style={{fontSize:12,color:d.channels.busy>0?'var(--ok)':'var(--text-3)',fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{width:7,height:7,borderRadius:'50%',background:d.channels.busy>0?'var(--ok)':'var(--text-3)',animation:d.channels.busy>0?'pulsePip 1.5s infinite':'none'}}/>
+              {d.channels.busy>0?'통화 중':'대기'}</span></div>
+          <div className="card-b">
+            <div className="ch-usage-bar"><div className="ch-usage-fill" style={{width:(d.channels.busy/d.channels.total*100)+'%'}}/></div>
+            <div className="ch-grid">
+              {d.channels.cells.map((c,i)=><div key={i} className={'ch-cell '+c} title={'채널 '+(i+1)}>{i+1}</div>)}
+            </div>
+            <div className="ch-legend">
+              <span><i style={{background:'var(--ok)'}}/>통화 중 ({d.channels.busy})</span>
+              <span><i style={{background:'var(--surface-3)'}}/>대기 ({d.channels.idle})</span>
+            </div>
+          </div></div>}
         {/* 추이 차트 */}
         <div className="card">
           <div className="card-h"><div className="card-t">최근 2주 송수신 추이</div>
@@ -435,6 +483,24 @@ function Dashboard({setPage}){
             </div>:<div style={{textAlign:'center',padding:'20px 0',color:'var(--text-3)',fontSize:13}}>처리할 항목이 없습니다</div>}
           </div>
         </div>
+        {/* 실시간 활동 피드 */}
+        {d.recent_activity&&d.recent_activity.length>0&&<div className="card" style={{marginBottom:16}}>
+          <div className="card-h"><div className="card-t">실시간 활동
+            <span style={{width:6,height:6,borderRadius:'50%',background:'var(--ok)',animation:'pulsePip 1.5s infinite',marginLeft:4}}/></div></div>
+          <div className="card-b" style={{paddingTop:4,paddingBottom:4}}>
+            <div className="feed">
+              {d.recent_activity.slice(0,6).map((a,i)=>{
+                const st=a.status==='sent'?'ok':a.status==='failed'?'err':'wait';
+                const stTxt=a.status==='sent'?'발송 완료':a.status==='failed'?'발송 실패':a.status==='queued'?'전송 중':a.status;
+                const t=(a.at||'').slice(11,16);
+                return <div className="feed-item" key={i}>
+                  <span className={'feed-dot '+st}/>
+                  <div className="feed-main"><div className="feed-t mono">{a.number||'-'}</div>
+                    <div className="feed-s">{stTxt} · {a.pages||0}p</div></div>
+                  <span className="feed-time">{t}</span>
+                </div>;})}
+            </div>
+          </div></div>}
         {/* 빠른 작업 */}
         <div className="card">
           <div className="card-h"><div className="card-t">빠른 작업</div></div>
@@ -830,17 +896,42 @@ function ImportModal({toast,onClose,onDone}){
 }
 function Stats(){
   const [dept,setDept]=useState(null),[usr,setUsr]=useState(null);
-  useEffect(()=>{api('/api/stats/by-department').then(setDept).catch(()=>setDept([]));api('/api/stats/by-user').then(setUsr).catch(()=>setUsr([]));},[]);
-  return <div>
+  const [sum,setSum]=useState(null),[daily,setDaily]=useState(null),[days,setDays]=useState(14);
+  useEffect(()=>{
+    api('/api/stats/by-department').then(setDept).catch(()=>setDept([]));
+    api('/api/stats/by-user').then(setUsr).catch(()=>setUsr([]));
+    api('/api/stats/summary').then(setSum).catch(()=>{});
+  },[]);
+  useEffect(()=>{api('/api/stats/daily?days='+days).then(setDaily).catch(()=>setDaily({sent:[],received:[]}));},[days]);
+  // 부서별 발송 최대값 (막대 비율용)
+  const deptMax=dept&&dept.length?Math.max(...dept.map(d=>d.sent_count||0),1):1;
+  return <div className="page-enter">
+    {/* 요약 지표 */}
+    <div className="stats-grid">
+      <div className="stat"><div className="lbl"><span className="dot"/>총 발송</div><div className="num">{sum?(sum.sent?.total??0).toLocaleString():'—'}</div><div className="meta">누적</div></div>
+      <div className="stat"><div className="lbl"><span className="dot ok"/>발송 성공률</div><div className="num">{sum?(sum.success_rate??0):'—'}%</div><div className="meta">성공 {sum?.sent?.ok??0} / 실패 {sum?.sent?.fail??0}</div></div>
+      <div className="stat"><div className="lbl"><span className="dot"/>총 수신</div><div className="num">{sum?(sum.received?.total??0).toLocaleString():'—'}</div><div className="meta">안읽음 {sum?.received?.unread??0}</div></div>
+      <div className="stat"><div className="lbl"><span className="dot wait"/>오늘 발송</div><div className="num">{sum?(sum.today?.sent??0):'—'}</div><div className="meta">성공 {sum?.today?.ok??0}</div></div>
+    </div>
+    {/* 추이 차트 + 기간선택 */}
+    <div className="card"><div className="card-h"><div className="card-t">송수신 추이</div>
+      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+        <div className="seg">{[[7,'7일'],[14,'2주'],[30,'1개월'],[90,'3개월']].map(([v,l])=><button key={v} className={days===v?'on':''} onClick={()=>setDays(v)}>{l}</button>)}</div>
+        <div className="chart-legend"><span><i style={{background:'var(--accent)'}}/>발송</span><span><i style={{background:'#a5b4fc'}}/>수신</span></div>
+      </div></div>
+      <div className="card-b"><DailyChart daily={daily}/></div></div>
+    {/* 부서별 (막대 포함) */}
     <div className="card"><div className="card-h"><div className="card-t">부서별 송수신</div>
-      <a className="btn btn-s" href={API+'/api/data/export/stats'} download>{I.download}부서별 엑셀</a>
-      <a className="btn btn-s" href={API+'/api/data/export/client-report?days=30'} download>{I.download}고객사별 실적</a></div>
-      {dept===null?<Loading/>:dept.length?<table className="tbl"><thead><tr><th>부서</th><th className="num">발송</th><th className="num">성공</th><th className="num">수신</th></tr></thead>
-      <tbody>{dept.map(d=><tr key={d.id}><td style={{fontWeight:600}}>{d.name}</td><td className="num mono">{d.sent_count}</td><td className="num mono" style={{color:'var(--ok)'}}>{d.sent_ok}</td><td className="num mono">{d.recv_count}</td></tr>)}</tbody></table>
+      <div className="btn-row"><a className="btn btn-s" href={API+'/api/data/export/stats'} download>{I.download}부서별 엑셀</a>
+      <a className="btn btn-s" href={API+'/api/data/export/client-report?days=30'} download>{I.download}고객사별 실적</a></div></div>
+      {dept===null?<SkeletonTable rows={4}/>:dept.length?<table className="tbl"><thead><tr><th>부서</th><th className="num">발송</th><th className="num">성공</th><th className="num">수신</th><th style={{width:140}}>발송 비중</th></tr></thead>
+      <tbody>{dept.map(d=><tr key={d.id}><td style={{fontWeight:600}}>{d.name}</td><td className="num mono">{d.sent_count}</td><td className="num mono" style={{color:'var(--ok)'}}>{d.sent_ok}</td><td className="num mono">{d.recv_count}</td>
+        <td><div style={{height:7,background:'var(--surface-3)',borderRadius:5,overflow:'hidden'}}><div style={{height:'100%',width:((d.sent_count||0)/deptMax*100)+'%',background:'linear-gradient(90deg,var(--accent-2),var(--accent))',borderRadius:5}}/></div></td></tr>)}</tbody></table>
       :<Empty icon={I.building} t="부서 데이터 없음" d="부서를 만들고 팩스를 주고받으면 집계됩니다"/>}</div>
-    <div className="card"><div className="card-h"><div className="card-t">사용자별 발송</div></div>
-      {usr===null?<Loading/>:usr.length?<table className="tbl"><thead><tr><th>이름</th><th>아이디</th><th className="num">발송</th><th className="num">성공</th></tr></thead>
-      <tbody>{usr.map(u=><tr key={u.id}><td style={{fontWeight:600}}>{u.display_name}</td><td className="mono dim">{u.username}</td><td className="num mono">{u.sent_count}</td><td className="num mono" style={{color:'var(--ok)'}}>{u.sent_ok}</td></tr>)}</tbody></table>
+    {/* 사용자별 */}
+    <div className="card"><div className="card-h"><div className="card-t">사용자별 발송 <span className="muted">· 상위 20명</span></div></div>
+      {usr===null?<SkeletonTable rows={4}/>:usr.length?<table className="tbl"><thead><tr><th>이름</th><th>아이디</th><th className="num">발송</th><th className="num">성공</th><th className="num">성공률</th></tr></thead>
+      <tbody>{usr.map(u=>{const rate=u.sent_count?Math.round(u.sent_ok/u.sent_count*100):0;return <tr key={u.id}><td style={{fontWeight:600}}>{u.display_name}</td><td className="mono dim">{u.username}</td><td className="num mono">{u.sent_count}</td><td className="num mono" style={{color:'var(--ok)'}}>{u.sent_ok}</td><td className="num mono" style={{color:rate>=90?'var(--ok)':rate>=70?'var(--wait)':'var(--err)'}}>{rate}%</td></tr>;})}</tbody></table>
       :<Empty icon={I.users} t="사용자 데이터 없음"/>}</div>
   </div>;
 }

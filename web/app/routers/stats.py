@@ -2,6 +2,7 @@
 통계·관리 라우터 - 송수신 통계, 부서별/사용자별 집계, 기간별 리포트, 감사 로그.
 관리자·매니저 권한.
 """
+import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 
@@ -111,12 +112,37 @@ def dashboard(user=Depends(get_current_user)):
         "FROM fax_jobs WHERE status='failed' AND created_at >= CURRENT_DATE - 7 "
         "GROUP BY last_error_code ORDER BY c DESC LIMIT 5") or []
 
+    # ── 실시간 채널 상태 (신호등용) ──
+    # 전체 채널 수 + 현재 사용 중 → 각 채널 불빛 표시
+    max_ch = engine.get('max_channels') or 30
+    try:
+        max_ch = int(os.environ.get('FAXAPP_MAX_CHANNELS', max_ch))
+    except Exception:
+        max_ch = 30
+    used = engine.get('channels_used', 0) or 0
+    active_now = inprog.get('active', 0) or 0
+    busy = max(used, active_now)
+    channels = []
+    for i in range(max_ch):
+        channels.append('busy' if i < busy else 'idle')
+
+    # ── 최근 활동 피드 (실시간 흐름) ──
+    recent_acts = db.query(
+        "SELECT to_number, status, pages, created_at, 'send' AS dir "
+        "FROM fax_jobs ORDER BY id DESC LIMIT 8") or []
+
     return {
         'engine': engine,
         'today': {'total': t_total, 'ok': t_ok, 'fail': today.get('fail', 0) or 0,
                   'rate': t_rate, 'yesterday': yday.get('total', 0) or 0},
         'processing': {'active': inprog.get('active', 0) or 0,
                        'retry_wait': inprog.get('retry_wait', 0) or 0},
+        'channels': {'total': max_ch, 'busy': busy, 'idle': max_ch - busy,
+                     'cells': channels},
+        'recent_activity': [
+            {'number': r['to_number'], 'status': r['status'],
+             'pages': r['pages'], 'at': str(r['created_at']), 'dir': r['dir']}
+            for r in recent_acts],
         'action_needed': {
             'failed_7d': fail7.get('c', 0) or 0,
             'stuck': stuck.get('c', 0) or 0,

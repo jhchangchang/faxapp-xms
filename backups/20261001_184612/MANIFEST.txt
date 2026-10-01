@@ -1,0 +1,4 @@
+faxapp 백업
+일시: 2026. 10. 01. (목) 18:46:12 KST
+DB: faxapp @ 127.0.0.1
+포함: DB(sql.gz), 수신파일(tar.gz), 설정(env)
