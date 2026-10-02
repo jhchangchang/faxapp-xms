@@ -205,9 +205,12 @@ def _retry_one(job):
         # 서버가 여전히 안 되면 다시 재시도 예약 (횟수 소진까지)
         exc = errors.FaxServerError(detail=str(e), context={'job_id': job_id})
         if RetryPolicy.should_retry(exc, attempt + 1):
+            # 아직 재시도 여지 있음 = 일시적 오류. 관리자 화면에는 안 남김(파이썬 로그만).
             _mark_retry_wait(job_id, exc, attempt + 1)
         else:
+            # 재시도 모두 소진한 최종 실패 = 관리자가 봐야 함. exhausted 표시.
             _mark_failed(job_id, f'재시도 소진: {e}')
+            exc.exhausted = True
         error_handler.log_error(exc, path='retry_worker', job_id=job_id)
 
 

@@ -42,12 +42,19 @@ def log_error(exc, *, path=None, user_id=None, job_id=None):
         detail = f'{type(exc).__name__}: {exc}'
         context = {}
 
-    # 파이썬 로거 (항상)
+    # 파이썬 로거 (항상 — 디버깅용으로는 모든 오류를 남김)
     log_line = f'[{code}/{category}] {detail}'
     if category in (Category.SYSTEM.value, 'UNHANDLED'):
         logger.error(log_line, extra={'context': context})
     else:
         logger.warning(log_line)
+
+    # ── 관리자 화면(error_log) 기록 필터 ──
+    # 일시적 오류(RETRYABLE)는 자동 재시도로 해결되는 "운영 무해" 건이므로
+    # 관리자 오류 로그에는 남기지 않는다. (파이썬 로그에는 위에서 이미 기록됨)
+    # 단, 재시도까지 모두 소진한 최종 실패(exhausted=True)는 관리자가 봐야 하므로 기록.
+    if category == Category.RETRYABLE.value and not getattr(exc, 'exhausted', False):
+        return None
 
     # DB 기록 (실패해도 앱은 계속)
     try:
