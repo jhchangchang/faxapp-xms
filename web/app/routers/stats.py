@@ -246,9 +246,34 @@ def history(
 
 
 @router.get('/audit')
-def audit_log(limit: int = 100, user=Depends(require_admin)):
-    """감사 로그 조회 (관리자)."""
-    return db.query(
+def audit_log(action: str = None, username: str = None,
+              date_from: str = None, date_to: str = None,
+              limit: int = 50, offset: int = 0, user=Depends(require_admin)):
+    """감사 로그 조회 (관리자) — 페이지네이션 + 검색.
+    - action: 동작 필터(login/send/delete 등), username: 사용자 검색
+    - date_from/date_to: 기간
+    반환: {items, total, limit, offset}
+    """
+    limit = min(max(int(limit), 1), 200)
+    offset = max(int(offset), 0)
+    cond, params = [], []
+    if action:
+        cond.append('a.action=%s'); params.append(action)
+    if username:
+        cond.append('u.username LIKE %s'); params.append(f'%{username}%')
+    if date_from:
+        cond.append('a.created_at >= %s'); params.append(date_from)
+    if date_to:
+        cond.append('a.created_at < (%s::date + 1)'); params.append(date_to)
+    where = (' WHERE ' + ' AND '.join(cond)) if cond else ''
+
+    total_row = db.query_one(
+        f"SELECT COUNT(*) AS c FROM audit_log a LEFT JOIN users u ON a.user_id=u.id{where}",
+        tuple(params))
+    total = total_row['c'] if total_row else 0
+
+    items = db.query(
         "SELECT a.id, a.user_id, u.username, a.action, a.detail, a.ip, a.created_at "
-        "FROM audit_log a LEFT JOIN users u ON a.user_id=u.id "
-        "ORDER BY a.id DESC LIMIT %s", (min(limit, 500),))
+        f"FROM audit_log a LEFT JOIN users u ON a.user_id=u.id{where} "
+        "ORDER BY a.id DESC LIMIT %s OFFSET %s", tuple(params) + (limit, offset))
+    return {'items': items, 'total': total, 'limit': limit, 'offset': offset}

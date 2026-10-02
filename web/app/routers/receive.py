@@ -49,12 +49,27 @@ def receive_webhook(body: WebhookBody, request: Request):
     팩스 서버가 수신 완료 시 호출하는 웹훅.
     ※ 내부 통신용 - 운영 시 IP 화이트리스트/토큰 인증 권장.
     """
+    # 차단된 발신번호는 수신 거부
+    try:
+        from .blocklist import is_blocked
+        if is_blocked(body.from_number or '', 'recv'):
+            return {'ok': True, 'blocked': True, 'message': '차단된 발신번호'}
+    except Exception:
+        pass
     dept_id, user_id = _classify(body.to_number)
     row = db.execute(
         'INSERT INTO fax_received(from_number, to_number, dept_id, user_id, '
         'file_path, pages, rate) VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING id',
         (body.from_number, body.to_number, dept_id, user_id,
          body.file_path, body.pages, body.rate), returning=True)
+    # 수신 이메일 알림 (설정 시 + notify_on_recv ON일 때만)
+    try:
+        cfg = db.query_one('SELECT notify_on_recv FROM notify_config WHERE id=1')
+        if cfg and cfg.get('notify_on_recv'):
+            from ..core import email_notify
+            email_notify.notify_recv_email(body.from_number, body.pages)
+    except Exception:
+        pass
     return {'ok': True, 'id': row['id'], 'classified': {'dept_id': dept_id, 'user_id': user_id}}
 
 

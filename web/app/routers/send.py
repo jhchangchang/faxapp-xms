@@ -126,6 +126,15 @@ async def send_fax(
     number = (number or '').strip()
     if not _valid_fax_number(number):
         raise errors.InvalidFaxNumber(context={'number': number})
+    # 0-0. 차단 번호 체크
+    try:
+        from .blocklist import is_blocked
+        if is_blocked(number, 'send'):
+            raise errors.ValidationError(detail=f'차단된 번호입니다: {number}')
+    except errors.FaxAppError:
+        raise
+    except Exception:
+        pass
     # 0-1. 예약 시각 파싱 (있으면)
     sched_dt = None
     if scheduled_at and scheduled_at.strip():
@@ -861,6 +870,14 @@ def _apply_failure(job, exc, extra_pages=None, engine_permanent=False):
         try:
             from ..core import notify
             notify.notify_send_failure(job, exc)
+        except Exception:
+            pass
+        # 이메일 알림 (설정 시) — 최종 실패만, 재시도 가능 건은 제외
+        try:
+            if exc.category.value != 'retryable':
+                from ..core import email_notify
+                email_notify.notify_fail_email(job.get('to_number', ''),
+                                               exc.user_message or exc.code)
         except Exception:
             pass
         return {'ok': True, 'job_id': job_id, 'status': 'failed',

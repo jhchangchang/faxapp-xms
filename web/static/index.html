@@ -1170,6 +1170,97 @@ function Scheduled({toast}){
   </div>;
 }
 
+function BlockList({toast}){
+  const [list,setList]=useState(null),[total,setTotal]=useState(0),[offset,setOffset]=useState(0);
+  const [num,setNum]=useState(''),[dir,setDir]=useState('both'),[reason,setReason]=useState('');
+  const PAGE=50;
+  const DIR_L={both:'발송+수신',send:'발송',recv:'수신'};
+  const load=(off=offset)=>{api('/api/blocklist?limit='+PAGE+'&offset='+off).then(r=>{setList(r.items||[]);setTotal(r.total||0);setOffset(r.offset||0);}).catch(()=>{setList([]);setTotal(0);});};
+  useEffect(()=>{load(0);},[]);
+  const add=async()=>{if(!num.trim()){toast('번호를 입력하세요','err');return;}try{const r=await api('/api/blocklist',{method:'POST',body:J({number:num.trim(),direction:dir,reason})});toast(r.message||'추가됨',r.ok?'ok':'err');if(r.ok){setNum('');setReason('');load(0);}}catch(e){toast(e.message,'err');}};
+  const del=async(id)=>{try{await api('/api/blocklist/'+id,{method:'DELETE'});load();}catch(e){toast(e.message,'err');}};
+  if(list===null)return <Loading/>;
+  return <div>
+    <div className="card" style={{marginBottom:16}}><div className="card-h"><div className="card-t">번호 차단 추가</div></div>
+      <div className="card-b"><div style={{display:'flex',gap:10,alignItems:'flex-end',flexWrap:'wrap'}}>
+        <div className="frm" style={{margin:0,flex:1,minWidth:160}}><label>차단할 번호</label><input className="inp" value={num} onChange={e=>setNum(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="02-1234-5678"/></div>
+        <div className="frm" style={{margin:0}}><label>방향</label><select value={dir} onChange={e=>setDir(e.target.value)} style={{padding:'11px 13px',border:'1px solid var(--border-strong)',borderRadius:'var(--r-sm)',fontSize:13.5}}><option value="both">발송+수신</option><option value="send">발송만</option><option value="recv">수신만</option></select></div>
+        <div className="frm" style={{margin:0,flex:1,minWidth:140}}><label>사유 (선택)</label><input className="inp" value={reason} onChange={e=>setReason(e.target.value)} placeholder="스팸 등"/></div>
+        <button className="btn btn-a" onClick={add}>차단 추가</button>
+      </div></div></div>
+    <div className="card"><div className="card-h"><div className="card-t">차단 목록 <span className="muted">· 총 {total}건</span></div></div>
+      {list.length?<table className="tbl"><thead><tr><th>번호</th><th>방향</th><th>사유</th><th>등록자</th><th>등록일</th><th></th></tr></thead>
+      <tbody>{list.map(b=><tr key={b.id}>
+        <td className="mono" style={{fontWeight:600}}>{b.number}</td>
+        <td><span className={'badge '+(b.direction==='both'?'b-err':'b-wait')}>{DIR_L[b.direction]||b.direction}</span></td>
+        <td className="dim">{b.reason||'-'}</td><td className="dim">{b.created_by_name||'-'}</td>
+        <td className="mono dim">{fmt(b.created_at)}</td>
+        <td><button className="btn btn-x btn-err" onClick={()=>del(b.id)}>해제</button></td>
+      </tr>)}</tbody></table>:<Empty icon={I.alert} t="차단된 번호 없음" d="스팸이나 특정 번호를 차단하면 여기에 표시됩니다"/>}
+      {total>PAGE&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,padding:14,borderTop:'1px solid var(--border)'}}>
+        <button className="btn btn-s" disabled={offset<=0} onClick={()=>load(Math.max(0,offset-PAGE))}>← 이전</button>
+        <span style={{fontSize:13,fontWeight:600}}>{Math.floor(offset/PAGE)+1} / {Math.ceil(total/PAGE)}</span>
+        <button className="btn btn-s" disabled={offset+PAGE>=total} onClick={()=>load(offset+PAGE)}>다음 →</button></div>}
+    </div></div>;
+}
+
+function AuditLog({toast}){
+  const [list,setList]=useState(null),[total,setTotal]=useState(0),[offset,setOffset]=useState(0);
+  const [qUser,setQUser]=useState(''),[qAct,setQAct]=useState(''),[qDF,setQDF]=useState(''),[qDT,setQDT]=useState('');
+  const PAGE_SIZE=50;
+  const ACT_LABEL={login:'로그인',logout:'로그아웃',send:'팩스 발송',delete:'삭제',
+    resend:'재전송',resend_pages:'페이지 재전송',create:'생성',update:'수정',
+    login_fail:'로그인 실패',bulk_delete:'일괄 삭제',cancel:'취소'};
+  const ACT_COLOR={login:'b-ok',logout:'b-dim',send:'b-send',delete:'b-err',
+    login_fail:'b-err',bulk_delete:'b-err'};
+  const load=(off=offset)=>{
+    const p=new URLSearchParams();
+    if(qUser)p.set('username',qUser);
+    if(qAct)p.set('action',qAct);
+    if(qDF)p.set('date_from',qDF);
+    if(qDT)p.set('date_to',qDT);
+    p.set('limit',PAGE_SIZE);p.set('offset',off);
+    api('/api/stats/audit?'+p.toString()).then(r=>{
+      setList(r.items||[]);setTotal(r.total||0);setOffset(r.offset||0);
+    }).catch(()=>{setList([]);setTotal(0);});
+  };
+  useEffect(()=>{load(0);},[]);
+  const doSearch=()=>{setOffset(0);load(0);};
+  const goPage=(o)=>{setOffset(o);load(o);};
+  if(list===null)return <Loading/>;
+  return <div className="card">
+    <div className="card-h"><div className="card-t">감사 로그 <span className="muted">· 사용자 활동 추적</span></div></div>
+    <div style={{display:'flex',gap:8,padding:'12px 16px',borderBottom:'1px solid var(--border)',flexWrap:'wrap',alignItems:'center',background:'var(--surface-2)'}}>
+      <input placeholder="사용자" value={qUser} onChange={e=>setQUser(e.target.value)} onKeyDown={e=>e.key==='Enter'&&doSearch()} style={{padding:'7px 11px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:13,width:110}}/>
+      <select value={qAct} onChange={e=>setQAct(e.target.value)} style={{padding:'7px 11px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:13}}>
+        <option value="">전체 동작</option>
+        {Object.entries(ACT_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+      </select>
+      <span style={{fontSize:12,color:'var(--text-3)'}}>기간</span>
+      <input type="date" value={qDF} onChange={e=>setQDF(e.target.value)} style={{padding:'6px 9px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:12.5}}/>
+      <span style={{color:'var(--text-3)'}}>~</span>
+      <input type="date" value={qDT} onChange={e=>setQDT(e.target.value)} style={{padding:'6px 9px',border:'1px solid var(--border-strong)',borderRadius:8,fontSize:12.5}}/>
+      <button className="btn btn-s btn-a" onClick={doSearch}>검색</button>
+      {(qUser||qAct||qDF||qDT)&&<button className="btn btn-s" onClick={()=>{setQUser('');setQAct('');setQDF('');setQDT('');setOffset(0);setTimeout(()=>load(0),0);}}>초기화</button>}
+      <span style={{marginLeft:'auto',fontSize:12.5,color:'var(--text-3)'}}>총 <b style={{color:'var(--text)'}}>{total.toLocaleString()}</b>건</span>
+    </div>
+    {list.length?<table className="tbl"><thead><tr><th>시각</th><th>사용자</th><th>동작</th><th>상세</th><th>IP</th></tr></thead>
+    <tbody>{list.map(a=><tr key={a.id}>
+      <td className="mono dim">{fmt(a.created_at)}</td>
+      <td style={{fontWeight:600}}>{a.username||'-'}</td>
+      <td><span className={'badge '+(ACT_COLOR[a.action]||'b-dim')}>{ACT_LABEL[a.action]||a.action}</span></td>
+      <td className="dim" style={{maxWidth:360,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={a.detail}>{a.detail||'-'}</td>
+      <td className="mono dim">{a.ip||'-'}</td>
+    </tr>)}</tbody></table>:<Empty icon={I.clip} t="감사 로그 없음" d="사용자 활동(로그인·발송·삭제 등)이 여기에 기록됩니다"/>}
+    {total>PAGE_SIZE&&<div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:14,padding:'14px',borderTop:'1px solid var(--border)'}}>
+      <button className="btn btn-s" disabled={offset<=0} onClick={()=>goPage(Math.max(0,offset-PAGE_SIZE))}>← 이전</button>
+      <span style={{fontSize:13,color:'var(--text-2)',fontWeight:600}}>{Math.floor(offset/PAGE_SIZE)+1} / {Math.max(1,Math.ceil(total/PAGE_SIZE))} 페이지
+        <span style={{color:'var(--text-3)',fontWeight:400,marginLeft:8}}>({offset+1}–{Math.min(offset+PAGE_SIZE,total)} / {total.toLocaleString()})</span></span>
+      <button className="btn btn-s" disabled={offset+PAGE_SIZE>=total} onClick={()=>goPage(offset+PAGE_SIZE)}>다음 →</button>
+    </div>}
+  </div>;
+}
+
 function ApiKeys({toast}){
   const [keys,setKeys]=useState(null),[name,setName]=useState(''),[busy,setBusy]=useState(false),[newKey,setNewKey]=useState(null),[err,setErr]=useState(null);
   const load=()=>api('/api/v1/keys').then(k=>{setKeys(k);setErr(null);}).catch(e=>{setErr(e.message);setKeys([]);});
@@ -1225,6 +1316,7 @@ function NotifyConfig({toast}){
   useEffect(()=>{api('/api/notify/config').then(c=>{setCfg(c);setErr(null);}).catch(e=>{setErr(e.message);setCfg({webhook_url:'',notify_on_fail:true,notify_on_recv:false});});},[]);
   const save=async()=>{setBusy(true);try{await api('/api/notify/config',{method:'POST',body:J(cfg)});toast('알림 설정 저장됨','ok');setErr(null);}catch(e){toast(e.message,'err');setErr(e.message);}finally{setBusy(false);}};
   const test=async()=>{try{const r=await api('/api/notify/test',{method:'POST'});toast(r.message||'테스트 알림 발송','ok');}catch(e){toast(e.message,'err');}};
+  const testEmail=async()=>{try{const r=await api('/api/notify/test-email',{method:'POST'});toast(r.message||'이메일 테스트','ok');}catch(e){toast(e.message,'err');}};
   if(!cfg)return <Loading/>;
   return <div className="card" style={{maxWidth:640}}>
     <div className="card-h"><div className="card-t">알림 설정</div></div>
@@ -1237,9 +1329,30 @@ function NotifyConfig({toast}){
         <input className="inp" value={cfg.webhook_url||''} onChange={e=>setCfg({...cfg,webhook_url:e.target.value})} placeholder="https://hooks.slack.com/services/..."/></div>
       <label className="check" style={{marginBottom:12}}><input type="checkbox" checked={cfg.notify_on_fail} onChange={e=>setCfg({...cfg,notify_on_fail:e.target.checked})}/>발송 실패 시 알림</label>
       <label className="check" style={{marginBottom:18}}><input type="checkbox" checked={cfg.notify_on_recv} onChange={e=>setCfg({...cfg,notify_on_recv:e.target.checked})}/>팩스 수신 시 알림</label>
+
+      {/* 이메일 알림 설정 */}
+      <div style={{borderTop:'1px solid var(--border)',margin:'6px 0 18px'}}/>
+      <div className="card-t" style={{fontSize:14,marginBottom:4}}>이메일 알림</div>
+      <div className="dim" style={{fontSize:12.5,marginBottom:14}}>발송 실패·수신 시 지정한 이메일로 통보합니다.</div>
+      <label className="check" style={{marginBottom:14}}><input type="checkbox" checked={cfg.email_enabled} onChange={e=>setCfg({...cfg,email_enabled:e.target.checked})}/>이메일 알림 사용</label>
+      {cfg.email_enabled&&<div style={{paddingLeft:4}}>
+        <div style={{display:'flex',gap:10}}>
+          <div className="frm" style={{flex:2}}><label>SMTP 서버</label><input className="inp" value={cfg.smtp_host||''} onChange={e=>setCfg({...cfg,smtp_host:e.target.value})} placeholder="smtp.gmail.com"/></div>
+          <div className="frm" style={{flex:1}}><label>포트</label><input className="inp" type="number" value={cfg.smtp_port||587} onChange={e=>setCfg({...cfg,smtp_port:parseInt(e.target.value)||587})}/></div>
+        </div>
+        <div style={{display:'flex',gap:10}}>
+          <div className="frm" style={{flex:1}}><label>계정(사용자)</label><input className="inp" value={cfg.smtp_user||''} onChange={e=>setCfg({...cfg,smtp_user:e.target.value})} placeholder="user@example.com"/></div>
+          <div className="frm" style={{flex:1}}><label>비밀번호 <span className="dim">(변경 시만 입력)</span></label><input className="inp" type="password" value={cfg.smtp_pass||''} onChange={e=>setCfg({...cfg,smtp_pass:e.target.value})} placeholder="••••••••"/></div>
+        </div>
+        <div className="frm"><label>보내는 주소 (From)</label><input className="inp" value={cfg.email_from||''} onChange={e=>setCfg({...cfg,email_from:e.target.value})} placeholder="faxapp@example.com"/></div>
+        <div className="frm"><label>받는 주소 (여러 개는 쉼표로)</label><input className="inp" value={cfg.email_to||''} onChange={e=>setCfg({...cfg,email_to:e.target.value})} placeholder="admin@example.com, manager@example.com"/></div>
+        <label className="check" style={{marginBottom:6}}><input type="checkbox" checked={cfg.smtp_tls!==false} onChange={e=>setCfg({...cfg,smtp_tls:e.target.checked})}/>TLS 사용 (권장)</label>
+      </div>}
+
       <div className="btn-row">
         <button className="btn btn-a" onClick={save} disabled={busy}>{busy?'저장 중…':'저장'}</button>
-        <button className="btn btn-s" onClick={test}>테스트 알림 보내기</button></div>
+        <button className="btn btn-s" onClick={test}>앱 알림 테스트</button>
+        {cfg.email_enabled&&<button className="btn btn-s" onClick={testEmail}>이메일 테스트</button>}</div>
     </div></div>;
 }
 
@@ -1334,10 +1447,12 @@ const NAV=[
   {id:'users',ic:'users',label:'사용자',sec:'설정',roles:['admin']},
   {id:'depts',ic:'building',label:'부서',sec:'설정',roles:['admin']},
   {id:'errlog',ic:'alert',label:'오류 로그',sec:'설정',roles:['admin']},
+  {id:'audit',ic:'clip',label:'감사 로그',sec:'설정',roles:['admin']},
+  {id:'blocklist',ic:'alert',label:'번호 차단',sec:'설정',roles:['admin']},
   {id:'notifycfg',ic:'bell',label:'알림 설정',sec:'설정',roles:['admin']},
   {id:'apikeys',ic:'users',label:'API 연동',sec:'설정',roles:['admin']},
 ];
-const TITLES={dashboard:['대시보드','오늘의 팩스 현황'],diag:['시스템 진단','문제 위치 실시간 확인'],send:['팩스 보내기',''],history:['발송 이력','보낸 팩스 관리'],mailmerge:['대량 발송','수신자별 맞춤 발송'],scheduled:['예약 발송','예약된 팩스 관리'],inbox:['받은 팩스',''],contacts:['주소록',''],stats:['통계','부서·사용자별 집계'],users:['사용자 관리',''],depts:['부서 관리',''],errlog:['오류 로그','시스템 예외 추적'],notifycfg:['알림 설정','실패·수신 통보 설정'],apikeys:['API 연동','외부 시스템 팩스 발송 키']};
+const TITLES={dashboard:['대시보드','오늘의 팩스 현황'],diag:['시스템 진단','문제 위치 실시간 확인'],send:['팩스 보내기',''],history:['발송 이력','보낸 팩스 관리'],mailmerge:['대량 발송','수신자별 맞춤 발송'],scheduled:['예약 발송','예약된 팩스 관리'],inbox:['받은 팩스',''],contacts:['주소록',''],stats:['통계','부서·사용자별 집계'],users:['사용자 관리',''],depts:['부서 관리',''],errlog:['오류 로그','시스템 예외 추적'],audit:['감사 로그','사용자 활동 추적'],blocklist:['번호 차단','스팸·특정 번호 차단'],notifycfg:['알림 설정','실패·수신 통보 설정'],apikeys:['API 연동','외부 시스템 팩스 발송 키']};
 function App(){
   const [user,setUser]=useState(undefined),[page,setPage]=useState('dashboard'),[toastMsg,setToast]=useState(null),[unread,setUnread]=useState(0);
   const [notifs,setNotifs]=useState([]),[notifOpen,setNotifOpen]=useState(false),[notifUnread,setNotifUnread]=useState(0);
@@ -1354,7 +1469,7 @@ function App(){
   const nav=NAV.filter(n=>!n.roles||n.roles.includes(user.role));
   const secs=[...new Set(nav.map(n=>n.sec))];
   const ti=TITLES[page]||['',''];
-  const PAGES={dashboard:<Dashboard setPage={setPage}/>,diag:<Diagnostics toast={toast}/>,send:<Send toast={toast}/>,history:<SendHistory toast={toast}/>,mailmerge:<MailMerge toast={toast}/>,scheduled:<Scheduled toast={toast}/>,inbox:<Inbox toast={toast} user={user}/>,contacts:<Contacts toast={toast}/>,stats:<Stats/>,users:<UserAdmin toast={toast}/>,depts:<DeptAdmin toast={toast}/>,errlog:<ErrorLog toast={toast}/>,notifycfg:<NotifyConfig toast={toast}/>,apikeys:<ApiKeys toast={toast}/>};
+  const PAGES={dashboard:<Dashboard setPage={setPage}/>,diag:<Diagnostics toast={toast}/>,send:<Send toast={toast}/>,history:<SendHistory toast={toast}/>,mailmerge:<MailMerge toast={toast}/>,scheduled:<Scheduled toast={toast}/>,inbox:<Inbox toast={toast} user={user}/>,contacts:<Contacts toast={toast}/>,stats:<Stats/>,users:<UserAdmin toast={toast}/>,depts:<DeptAdmin toast={toast}/>,errlog:<ErrorLog toast={toast}/>,audit:<AuditLog toast={toast}/>,blocklist:<BlockList toast={toast}/>,notifycfg:<NotifyConfig toast={toast}/>,apikeys:<ApiKeys toast={toast}/>};
   return <div className="shell">
     <aside className="side">
       <div className="side-top"><div className="mark">{I.fax}</div><div className="nm">FaxApp</div></div>
