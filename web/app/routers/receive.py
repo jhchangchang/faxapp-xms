@@ -43,33 +43,43 @@ def _classify(to_number):
     return None, None
 
 
+@router.get('/routing')
+def recv_routing(user=Depends(get_current_user)):
+    """수신번호(DID) 라우팅 현황 — 어느 번호가 누구/어느 부서로 가는지.
+    사용자·부서에 등록된 팩스번호를 모아서 보여줌 (관리용)."""
+    rows = []
+    # 사용자 개인 번호
+    users = db.query(
+        "SELECT u.fax_number, u.display_name, d.name AS dept_name "
+        "FROM users u LEFT JOIN departments d ON u.dept_id=d.id "
+        "WHERE u.fax_number IS NOT NULL AND u.fax_number<>'' AND u.is_active=true "
+        "ORDER BY u.fax_number") or []
+    for u in users:
+        rows.append({'number': u['fax_number'], 'type': 'user',
+                     'target': u['display_name'],
+                     'dept': u['dept_name'] or '-'})
+    # 부서 대표 번호
+    depts = db.query(
+        "SELECT fax_number, name FROM departments "
+        "WHERE fax_number IS NOT NULL AND fax_number<>'' ORDER BY fax_number") or []
+    for d in depts:
+        rows.append({'number': d['fax_number'], 'type': 'dept',
+                     'target': d['name'] + ' (부서 공용)', 'dept': d['name']})
+    return {'items': rows, 'total': len(rows)}
+
+
 @router.post('/webhook')
 def receive_webhook(body: WebhookBody, request: Request):
     """
     팩스 서버가 수신 완료 시 호출하는 웹훅.
     ※ 내부 통신용 - 운영 시 IP 화이트리스트/토큰 인증 권장.
     """
-    # 차단된 발신번호는 수신 거부
-    try:
-        from .blocklist import is_blocked
-        if is_blocked(body.from_number or '', 'recv'):
-            return {'ok': True, 'blocked': True, 'message': '차단된 발신번호'}
-    except Exception:
-        pass
     dept_id, user_id = _classify(body.to_number)
     row = db.execute(
         'INSERT INTO fax_received(from_number, to_number, dept_id, user_id, '
         'file_path, pages, rate) VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING id',
         (body.from_number, body.to_number, dept_id, user_id,
          body.file_path, body.pages, body.rate), returning=True)
-    # 수신 이메일 알림 (설정 시 + notify_on_recv ON일 때만)
-    try:
-        cfg = db.query_one('SELECT notify_on_recv FROM notify_config WHERE id=1')
-        if cfg and cfg.get('notify_on_recv'):
-            from ..core import email_notify
-            email_notify.notify_recv_email(body.from_number, body.pages)
-    except Exception:
-        pass
     return {'ok': True, 'id': row['id'], 'classified': {'dept_id': dept_id, 'user_id': user_id}}
 
 

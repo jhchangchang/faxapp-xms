@@ -126,11 +126,18 @@ async def send_fax(
     number = (number or '').strip()
     if not _valid_fax_number(number):
         raise errors.InvalidFaxNumber(context={'number': number})
-    # 0-0. 차단 번호 체크
+    # 중복 발송 방지: 같은 번호+같은 파일을 짧은 시간 내 재발송 차단 (실수 방지)
     try:
-        from .blocklist import is_blocked
-        if is_blocked(number, 'send'):
-            raise errors.ValidationError(detail=f'차단된 번호입니다: {number}')
+        if config.DUP_GUARD_MIN > 0 and file and file.filename:
+            dup = db.query_one(
+                "SELECT id FROM fax_jobs WHERE to_number=%s AND file_name=%s "
+                "AND user_id=%s AND status NOT IN ('failed','cancelled') "
+                "AND created_at > now() - interval '%s minutes' LIMIT 1",
+                (number, file.filename, user['user_id'], config.DUP_GUARD_MIN))
+            if dup:
+                raise errors.ValidationError(
+                    detail=f'방금 같은 번호로 같은 파일을 발송했습니다. '
+                           f'중복 발송을 막았습니다. ({config.DUP_GUARD_MIN}분 이내)')
     except errors.FaxAppError:
         raise
     except Exception:
@@ -870,14 +877,6 @@ def _apply_failure(job, exc, extra_pages=None, engine_permanent=False):
         try:
             from ..core import notify
             notify.notify_send_failure(job, exc)
-        except Exception:
-            pass
-        # 이메일 알림 (설정 시) — 최종 실패만, 재시도 가능 건은 제외
-        try:
-            if exc.category.value != 'retryable':
-                from ..core import email_notify
-                email_notify.notify_fail_email(job.get('to_number', ''),
-                                               exc.user_message or exc.code)
         except Exception:
             pass
         return {'ok': True, 'job_id': job_id, 'status': 'failed',

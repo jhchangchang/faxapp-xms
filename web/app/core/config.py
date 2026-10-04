@@ -35,6 +35,8 @@ APP_PORT = int(os.environ.get('FAXAPP_PORT', '8100'))
 
 # ---------- 보안 ----------
 # 발송 Rate Limit (스팸/과금 폭탄 방어). 사용자별.
+# 중복 발송 방지: 같은 번호+같은 파일을 이 시간(분) 내 재발송 시 차단. 0이면 비활성.
+DUP_GUARD_MIN = int(os.environ.get('FAXAPP_DUP_GUARD_MIN', '2'))
 RATE_SEND_PER_MIN  = int(os.environ.get('FAXAPP_RATE_SEND_MIN', '30'))    # 분당
 RATE_SEND_PER_HOUR = int(os.environ.get('FAXAPP_RATE_SEND_HOUR', '300'))  # 시간당
 

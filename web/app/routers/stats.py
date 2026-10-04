@@ -246,34 +246,70 @@ def history(
 
 
 @router.get('/audit')
-def audit_log(action: str = None, username: str = None,
-              date_from: str = None, date_to: str = None,
-              limit: int = 50, offset: int = 0, user=Depends(require_admin)):
-    """감사 로그 조회 (관리자) — 페이지네이션 + 검색.
-    - action: 동작 필터(login/send/delete 등), username: 사용자 검색
-    - date_from/date_to: 기간
-    반환: {items, total, limit, offset}
-    """
-    limit = min(max(int(limit), 1), 200)
-    offset = max(int(offset), 0)
-    cond, params = [], []
-    if action:
-        cond.append('a.action=%s'); params.append(action)
-    if username:
-        cond.append('u.username LIKE %s'); params.append(f'%{username}%')
-    if date_from:
-        cond.append('a.created_at >= %s'); params.append(date_from)
-    if date_to:
-        cond.append('a.created_at < (%s::date + 1)'); params.append(date_to)
-    where = (' WHERE ' + ' AND '.join(cond)) if cond else ''
-
-    total_row = db.query_one(
-        f"SELECT COUNT(*) AS c FROM audit_log a LEFT JOIN users u ON a.user_id=u.id{where}",
-        tuple(params))
-    total = total_row['c'] if total_row else 0
-
-    items = db.query(
+def audit_log(limit: int = 100, user=Depends(require_admin)):
+    """감사 로그 조회 (관리자)."""
+    return db.query(
         "SELECT a.id, a.user_id, u.username, a.action, a.detail, a.ip, a.created_at "
-        f"FROM audit_log a LEFT JOIN users u ON a.user_id=u.id{where} "
-        "ORDER BY a.id DESC LIMIT %s OFFSET %s", tuple(params) + (limit, offset))
-    return {'items': items, 'total': total, 'limit': limit, 'offset': offset}
+        "FROM audit_log a LEFT JOIN users u ON a.user_id=u.id "
+        "ORDER BY a.id DESC LIMIT %s", (min(limit, 500),))
+
+
+@router.get('/monthly')
+def monthly_stats(months: int = Query(default=6, le=24), user=Depends(get_current_user)):
+    """최근 N개월 월별 송수신 집계 (리포트용).
+    반환: {sent:[{month, total, ok, fail}], received:[{month, total}]}"""
+    sent = db.query(
+        "SELECT to_char(created_at, 'YYYY-MM') AS month, COUNT(*) AS total, "
+        "COUNT(*) FILTER (WHERE status='sent') AS ok, "
+        "COUNT(*) FILTER (WHERE status='failed') AS fail "
+        "FROM fax_jobs WHERE created_at >= date_trunc('month', CURRENT_DATE) - (%s||' months')::interval "
+        "GROUP BY month ORDER BY month", (months - 1,)) or []
+    recv = db.query(
+        "SELECT to_char(received_at, 'YYYY-MM') AS month, COUNT(*) AS total "
+        "FROM fax_received WHERE received_at >= date_trunc('month', CURRENT_DATE) - (%s||' months')::interval "
+        "GROUP BY month ORDER BY month", (months - 1,)) or []
+    return {'sent': sent, 'received': recv}
+
+
+@router.get('/period-summary')
+def period_summary(date_from: str = None, date_to: str = None,
+                   user=Depends(get_current_user)):
+    """지정 기간 송수신 요약 (리포트 상단용).
+    기간 미지정 시 이번 달. 반환: 발송/수신/성공률 집계."""
+    cond_s = []
+    params_s = []
+    if date_from:
+        cond_s.append('created_at >= %s'); params_s.append(date_from)
+    if date_to:
+        cond_s.append('created_at < (%s::date + 1)'); params_s.append(date_to)
+    if not cond_s:
+        cond_s.append("created_at >= date_trunc('month', CURRENT_DATE)")
+    where_s = ' WHERE ' + ' AND '.join(cond_s)
+    s = db.query_one(
+        "SELECT COUNT(*) AS total, "
+        "COUNT(*) FILTER (WHERE status='sent') AS ok, "
+        "COUNT(*) FILTER (WHERE status='failed') AS fail, "
+        "COALESCE(SUM(pages),0) AS pages "
+        f"FROM fax_jobs{where_s}", tuple(params_s)) or {}
+
+    cond_r = []
+    params_r = []
+    if date_from:
+        cond_r.append('received_at >= %s'); params_r.append(date_from)
+    if date_to:
+        cond_r.append('received_at < (%s::date + 1)'); params_r.append(date_to)
+    if not cond_r:
+        cond_r.append("received_at >= date_trunc('month', CURRENT_DATE)")
+    where_r = ' WHERE ' + ' AND '.join(cond_r)
+    r = db.query_one(
+        "SELECT COUNT(*) AS total, COALESCE(SUM(pages),0) AS pages "
+        f"FROM fax_received{where_r}", tuple(params_r)) or {}
+
+    total = s.get('total', 0) or 0
+    ok = s.get('ok', 0) or 0
+    return {
+        'send': {'total': total, 'ok': ok, 'fail': s.get('fail', 0) or 0,
+                 'pages': s.get('pages', 0) or 0,
+                 'rate': round(100 * ok / total, 1) if total else 100.0},
+        'recv': {'total': r.get('total', 0) or 0, 'pages': r.get('pages', 0) or 0},
+    }
